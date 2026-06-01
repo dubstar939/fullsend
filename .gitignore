@@ -7,56 +7,35 @@ dist/
 build/
 target/
 
-# Logs and temp files
-*.log
-*.tmp
+# TypeScript/JavaScript specific
+*.tsbuildinfo
+*.js.map
+*.d.ts
 
 # Environment variables
 .env
 .env.local
 *.env.*
 
-# Editors
+# Logs
+*.log
+
+# Coverage
+coverage/
+.nyc_output/
+istanbul/
+
+# IDE specific
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Python specific
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Compiled and binary files
-*.class
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# MyPy cache
-.mypy_cache/
-.pytest_cache/
-
-# Gradle
-.gradle/
-
-# macOS
+# OS generated
 .DS_Store
-
-# Windows
 Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
 ```
