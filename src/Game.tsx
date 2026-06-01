@@ -6,27 +6,56 @@ import { GAME_CONFIG } from './constants';
 interface GameProps {
   onGameOver: (score: number, coins: number) => void;
   carColor: string;
-  gameMode: string;
 }
 
-const Game: React.FC<GameProps> = ({ onGameOver, carColor, gameMode }) => {
+interface TrafficCar {
+  mesh: THREE.Group;
+  speed: number;
+  lane: number;
+}
+
+interface GameState {
+  playerSpeed: number;
+  playerX: number;
+  playerZ: number;
+  score: number;
+  coins: number;
+  distance: number;
+  isGameOver: boolean;
+  input: InputState;
+  traffic: TrafficCar[];
+  roadSegments: THREE.Group[];
+  time: number;
+  timeLeft: number;
+}
+
+interface InputState {
+  left: boolean;
+  right: boolean;
+  up: boolean;
+  down: boolean;
+}
+
+const createInitialGameState = (): GameState => ({
+  playerSpeed: 0,
+  playerX: 0,
+  playerZ: 0,
+  score: 0,
+  coins: 0,
+  distance: 0,
+  isGameOver: false,
+  input: { left: false, right: false, up: false, down: false },
+  traffic: [],
+  roadSegments: [],
+  time: 0,
+  timeLeft: 60,
+});
+
+const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
   const [currentScore, setCurrentScore] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const gameStateRef = useRef({
-    playerSpeed: 0,
-    playerX: 0,
-    playerZ: 0,
-    score: 0,
-    coins: 0,
-    distance: 0,
-    isGameOver: false,
-    input: { left: false, right: false, up: false, down: false },
-    traffic: [] as { mesh: THREE.Group, speed: number, lane: number }[],
-    roadSegments: [] as THREE.Group[],
-    time: 0,
-    timeLeft: 60,
-  });
+  const gameStateRef = useRef<GameState>(createInitialGameState());
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -62,25 +91,54 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, gameMode }) => {
     }
 
     // Input Handlers
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' || e.key === 'a') gameStateRef.current.input.left = true;
-      if (e.key === 'ArrowRight' || e.key === 'd') gameStateRef.current.input.right = true;
-      if (e.key === 'ArrowUp' || e.key === 'w') gameStateRef.current.input.up = true;
-      if (e.key === 'ArrowDown' || e.key === 's') gameStateRef.current.input.down = true;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'a':
+          gameStateRef.current.input.left = true;
+          break;
+        case 'ArrowRight':
+        case 'd':
+          gameStateRef.current.input.right = true;
+          break;
+        case 'ArrowUp':
+        case 'w':
+          gameStateRef.current.input.up = true;
+          break;
+        case 'ArrowDown':
+        case 's':
+          gameStateRef.current.input.down = true;
+          break;
+      }
     };
 
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' || e.key === 'a') gameStateRef.current.input.left = false;
-      if (e.key === 'ArrowRight' || e.key === 'd') gameStateRef.current.input.right = false;
-      if (e.key === 'ArrowUp' || e.key === 'w') gameStateRef.current.input.up = false;
-      if (e.key === 'ArrowDown' || e.key === 's') gameStateRef.current.input.down = false;
+    const handleKeyUp = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'a':
+          gameStateRef.current.input.left = false;
+          break;
+        case 'ArrowRight':
+        case 'd':
+          gameStateRef.current.input.right = false;
+          break;
+        case 'ArrowUp':
+        case 'w':
+          gameStateRef.current.input.up = false;
+          break;
+        case 'ArrowDown':
+        case 's':
+          gameStateRef.current.input.down = false;
+          break;
+      }
     };
 
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
     // Game Loop
     let lastTime = performance.now();
+    
     const spawnTraffic = () => {
       const lane = Math.floor(Math.random() * 4) - 1.5;
       const trafficCar = createCarBody(Math.random() > 0.5 ? '#999999' : '#ffffff');
@@ -93,61 +151,81 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, gameMode }) => {
       });
     };
 
-    const animate = (now: number) => {
-      if (gameStateRef.current.isGameOver) return;
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-
+    const updatePlayerMovement = (dt: number) => {
       const state = gameStateRef.current;
       
-      // Player Movement
-      if (state.input.up) state.playerSpeed = Math.min(state.playerSpeed + GAME_CONFIG.ACCELERATION, GAME_CONFIG.MAX_SPEED);
-      else if (state.input.down) state.playerSpeed = Math.max(state.playerSpeed - GAME_CONFIG.BRAKE_FORCE, 0);
-      else state.playerSpeed = Math.max(state.playerSpeed - 0.002, 0);
+      if (state.input.up) {
+        state.playerSpeed = Math.min(state.playerSpeed + GAME_CONFIG.ACCELERATION, GAME_CONFIG.MAX_SPEED);
+      } else if (state.input.down) {
+        state.playerSpeed = Math.max(state.playerSpeed - GAME_CONFIG.BRAKE_FORCE, 0);
+      } else {
+        state.playerSpeed = Math.max(state.playerSpeed - 0.002, 0);
+      }
 
       if (state.input.left) state.playerX = Math.max(state.playerX - 0.15, -6);
       if (state.input.right) state.playerX = Math.min(state.playerX + 0.15, 6);
 
       state.playerZ -= state.playerSpeed * 60 * dt;
       playerCar.position.set(state.playerX, 0, state.playerZ);
+    };
 
-      // UI update (throttled)
+    const updateUI = (now: number, dt: number) => {
       if (Math.floor(now / 100) > Math.floor((now - dt * 1000) / 100)) {
-        setCurrentScore(Math.floor(-state.playerZ / 10));
-        setCurrentSpeed(Math.floor(state.playerSpeed * 150));
+        setCurrentScore(Math.floor(-gameStateRef.current.playerZ / 10));
+        setCurrentSpeed(Math.floor(gameStateRef.current.playerSpeed * 150));
       }
+    };
 
-      // Camera Follow
+    const updateCamera = () => {
+      const state = gameStateRef.current;
       camera.position.set(state.playerX, 5, state.playerZ + 12);
       camera.lookAt(state.playerX, 2, state.playerZ - 10);
+    };
 
-      // Road Management
-      state.roadSegments.forEach(road => {
-        if (road.position.z > state.playerZ + 100) {
+    const updateRoadSegments = () => {
+      gameStateRef.current.roadSegments.forEach(road => {
+        if (road.position.z > gameStateRef.current.playerZ + 100) {
           road.position.z -= 500;
         }
       });
+    };
 
-      // Traffic Management
+    const checkCollision = (car: TrafficCar): boolean => {
+      const dist = playerCar.position.distanceTo(car.mesh.position);
+      return dist < 2.5;
+    };
+
+    const updateTraffic = (dt: number) => {
+      const state = gameStateRef.current;
+      
       if (Math.random() < 0.02) spawnTraffic();
 
       state.traffic.forEach((car, index) => {
         car.mesh.position.z -= car.speed * 60 * dt;
 
-        // Collision Check
-        const dist = playerCar.position.distanceTo(car.mesh.position);
-        if (dist < 2.5) {
+        if (checkCollision(car)) {
           state.isGameOver = true;
           onGameOver(Math.floor(-state.playerZ / 10), state.coins);
         }
 
-        // Clean up
         if (car.mesh.position.z > state.playerZ + 50) {
           scene.remove(car.mesh);
           state.traffic.splice(index, 1);
           state.score += 10;
         }
       });
+    };
+
+    const animate = (now: number) => {
+      if (gameStateRef.current.isGameOver) return;
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      updatePlayerMovement(dt);
+      updateUI(now, dt);
+      updateCamera();
+      updateRoadSegments();
+      updateTraffic(dt);
 
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
@@ -163,14 +241,14 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, gameMode }) => {
     window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(requestId);
       renderer.dispose();
       if (containerRef.current) containerRef.current.removeChild(renderer.domElement);
     };
-  }, [carColor, gameMode]);
+  }, [carColor]);
 
   return (
     <div ref={containerRef} className="w-full h-full">
