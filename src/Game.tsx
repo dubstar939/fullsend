@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { createCarBody, createRoadSegment } from './models';
-import { GAME_CONFIG } from './constants';
+import { createCarMesh, createRoadSegment } from './models';
+import { PHYSICS_CONFIG, TRAFFIC_CONFIG } from './constants';
 
 interface GameProps {
   onGameOver: (score: number, coins: number) => void;
@@ -79,7 +79,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
     scene.add(directionalLight);
 
     // Player
-    const playerCar = createCarBody(carColor);
+    const playerCar = createCarMesh(carColor);
     scene.add(playerCar);
 
     // Road Initialization
@@ -141,7 +141,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
     
     const spawnTraffic = () => {
       const lane = Math.floor(Math.random() * 4) - 1.5;
-      const trafficCar = createCarBody(Math.random() > 0.5 ? '#999999' : '#ffffff');
+      const trafficCar = createCarMesh(Math.random() > 0.5 ? '#999999' : '#ffffff');
       trafficCar.position.set(lane * 4, 0, gameStateRef.current.playerZ - 100);
       scene.add(trafficCar);
       gameStateRef.current.traffic.push({
@@ -155,11 +155,11 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
       const state = gameStateRef.current;
       
       if (state.input.up) {
-        state.playerSpeed = Math.min(state.playerSpeed + GAME_CONFIG.ACCELERATION, GAME_CONFIG.MAX_SPEED);
+        state.playerSpeed = Math.min(state.playerSpeed + PHYSICS_CONFIG.ACCELERATION_BASE, PHYSICS_CONFIG.MAX_SPEED);
       } else if (state.input.down) {
-        state.playerSpeed = Math.max(state.playerSpeed - GAME_CONFIG.BRAKE_FORCE, 0);
+        state.playerSpeed = Math.max(state.playerSpeed - PHYSICS_CONFIG.BRAKE_FORCE, 0);
       } else {
-        state.playerSpeed = Math.max(state.playerSpeed - 0.002, 0);
+        state.playerSpeed = Math.max(state.playerSpeed - PHYSICS_CONFIG.DECELERATION_FRICTION, 0);
       }
 
       if (state.input.left) state.playerX = Math.max(state.playerX - 0.15, -6);
