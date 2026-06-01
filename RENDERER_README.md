@@ -156,40 +156,81 @@ The low-poly shader (`lowpoly.wgsl.ts`) includes:
 3. **Limit Draw Calls**: Keep object count reasonable for mid-range devices
 4. **Reuse Meshes**: Share geometry between instances
 5. **Update Uniforms Efficiently**: Only update when transform changes
+6. **Frustum Culling**: Automatic - objects outside view are skipped
+7. **LOD System**: Configurable per-object with hysteresis to prevent popping
+8. **Distance Culling**: Objects beyond max LOD threshold are not rendered
+
+## Frustum Culling
+
+The renderer implements automatic view frustum culling:
+
+### How It Works
+1. **Frustum Extraction**: The camera extracts 6 planes (near, far, left, right, top, bottom) from the view-projection matrix each frame.
+2. **Bounding Spheres**: Each renderable has an automatically computed bounding sphere from its mesh vertices.
+3. **Sphere-Frustum Test**: Fast rejection test - if sphere center + radius is outside any plane, the object is culled.
+
+### API
+```typescript
+// Camera provides cached frustum
+const frustum = camera.getFrustum(); // ViewFrustum
+
+// Renderable checks visibility
+if (!renderable.shouldBeRendered(frustum, cameraPosition)) {
+  continue; // Skip rendering
+}
+```
+
+### Bounding Volume Types
+- **BoundingSphere**: Default, fast tests, auto-computed from mesh
+- **BoundingBox**: Available via `createBoundingBoxFromVertices()` for tighter fits
+
+## LOD System
+
+The Level of Detail system reduces geometry complexity based on distance:
+
+### Configuration
+```typescript
+// Per-object LOD settings
+const renderable = new WebGPURenderable(id, mesh, material, transform, {
+  distances: [30, 60, 100],    // Distance thresholds
+  lodMeshes: [meshLOD0, meshLOD1, meshLOD2] // Optional custom meshes
+});
+
+// Global LOD settings
+renderer.setLODSettings({
+  enabled: true,               // Enable/disable globally
+  defaultDistances: [30, 60, 100],
+  hysteresis: 0.1              // 10% hysteresis prevents popping
+});
+```
+
+### LOD Levels
+- **Level 0** (High): Distance < thresholds[0]
+- **Level 1** (Medium): thresholds[0] <= Distance < thresholds[1]
+- **Level 2** (Low): thresholds[1] <= Distance < thresholds[2]
+- **Culled**: Distance >= thresholds[last] (not rendered)
+
+### Hysteresis
+To prevent rapid LOD switching (popping), the system uses hysteresis:
+- LOD changes only occur when distance change exceeds `hysteresis * threshold`
+- Default: 10% hysteresis
+
+### Custom LOD Meshes
+Provide pre-simplified meshes for each level:
+```typescript
+const highDetail = createCubeMesh(bufferManager, 64);
+const mediumDetail = createCubeMesh(bufferManager, 16);
+const lowDetail = createCubeMesh(bufferManager, 4);
+
+const renderable = new WebGPURenderable('cube', highDetail, material, transform, {
+  distances: [20, 50, 100],
+  lodMeshes: [highDetail, mediumDetail, lowDetail]
+});
+```
 
 ## Extension Points
 
 The renderer is designed for future extensions:
-
-### Frustum Culling
-```typescript
-// In WebGPURenderable.shouldBeRendered():
-// TODO: Implement frustum culling
-// if (cameraFrustum && !cameraFrustum.intersectsMesh(this)) return false;
-```
-
-### Instancing
-```typescript
-// In WebGPURenderable:
-// TODO: Add instancing data
-// instanceData: InstanceData[];
-```
-
-### Shadow Maps
-```typescript
-// In WebGPUFrameGraph:
-// TODO: Add shadow pass
-// - Render depth from light perspective
-// - Sample in fragment shader
-```
-
-### Post-Processing
-```typescript
-// In WebGPUFrameGraph:
-// TODO: Add post-processing passes
-// - Render to intermediate texture
-// - Apply effects (bloom, AA, color grading)
-```
 
 ## Backend Swapping
 

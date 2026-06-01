@@ -16,6 +16,35 @@ export interface TransformData {
 }
 
 // ============================================================================
+// BOUNDING VOLUMES
+// ============================================================================
+
+export interface BoundingSphere {
+  center: vec3;
+  radius: number;
+}
+
+export interface BoundingBox {
+  min: vec3;
+  max: vec3;
+}
+
+export type BoundingVolume = BoundingSphere | BoundingBox;
+
+// ============================================================================
+// FRUSTUM
+// ============================================================================
+
+export interface FrustumPlane {
+  normal: vec3;
+  distance: number;
+}
+
+export interface ViewFrustum {
+  planes: FrustumPlane[]; // Near, Far, Left, Right, Top, Bottom
+}
+
+// ============================================================================
 // CAMERA
 // ============================================================================
 
@@ -125,6 +154,38 @@ export const LOWPOLY_VERTEX_STRIDE = 48; // bytes per vertex
 // RENDERABLE
 // ============================================================================
 
+/**
+ * LOD (Level of Detail) configuration per renderable.
+ */
+export interface LODConfig {
+  /** Distance thresholds for each LOD level (sorted ascending) */
+  distances: number[];
+  /** Optional custom meshes for each LOD level */
+  lodMeshes?: GPUMesh[];
+}
+
+export const DEFAULT_LOD_CONFIG: LODConfig = {
+  distances: [30, 60, 100], // High (<30), Medium (30-60), Low (60-100), Cull (>100)
+};
+
+/**
+ * Global LOD settings that can be overridden per-object.
+ */
+export interface GlobalLODSettings {
+  /** Enable/disable LOD system globally */
+  enabled: boolean;
+  /** Default distance thresholds */
+  defaultDistances: number[];
+  /** Hysteresis factor to prevent LOD popping (0-1) */
+  hysteresis: number;
+}
+
+export const DEFAULT_GLOBAL_LOD_SETTINGS: GlobalLODSettings = {
+  enabled: true,
+  defaultDistances: [30, 60, 100],
+  hysteresis: 0.1, // 10% hysteresis
+};
+
 export interface Renderable {
   id: string;
   mesh: GPUMesh;
@@ -133,8 +194,8 @@ export interface Renderable {
   visible: boolean;
   castShadow: boolean;
   receiveShadow: boolean;
-  // TODO: LOD component
-  // TODO: Instancing data
+  boundingVolume?: BoundingVolume;
+  lodConfig?: LODConfig;
 }
 
 // ============================================================================

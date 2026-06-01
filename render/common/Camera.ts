@@ -4,7 +4,8 @@
  */
 
 import { mat4, vec3 } from 'gl-matrix';
-import { CameraData, CameraUniforms, CAMERA_UNIFORM_SIZE } from '../../types/renderer.types';
+import { CameraData, CameraUniforms, CAMERA_UNIFORM_SIZE, ViewFrustum } from '../../types/renderer.types';
+import { extractFrustum } from '../common/Frustum';
 
 export class Camera {
   private _position: vec3;
@@ -19,6 +20,8 @@ export class Camera {
   
   private _viewMatrix: mat4;
   private _projectionMatrix: mat4;
+  private _viewProjectionMatrix: mat4;
+  private _frustum: ViewFrustum | null = null;
   private _dirty: boolean;
 
   constructor(config: Partial<CameraData> = {}) {
@@ -34,6 +37,7 @@ export class Camera {
     
     this._viewMatrix = mat4.create();
     this._projectionMatrix = mat4.create();
+    this._viewProjectionMatrix = mat4.create();
     this._dirty = true;
   }
 
@@ -114,6 +118,28 @@ export class Camera {
   }
 
   /**
+   * Get the combined view-projection matrix.
+   */
+  getViewProjectionMatrix(): mat4 {
+    if (this._dirty) {
+      this._updateMatrices();
+    }
+    return this._viewProjectionMatrix;
+  }
+
+  /**
+   * Get the view frustum for culling.
+   * Returns cached frustum if matrices haven't changed.
+   */
+  getFrustum(): ViewFrustum {
+    if (this._dirty || !this._frustum) {
+      const vpMatrix = this.getViewProjectionMatrix();
+      this._frustum = extractFrustum(vpMatrix);
+    }
+    return this._frustum;
+  }
+
+  /**
    * Get camera uniforms for WebGPU buffer upload.
    */
   getUniforms(): CameraUniforms {
@@ -160,6 +186,11 @@ export class Camera {
       );
     }
 
+    // Compute view-projection matrix
+    mat4.multiply(this._viewProjectionMatrix, this._projectionMatrix, this._viewMatrix);
+
+    // Invalidate cached frustum
+    this._frustum = null;
     this._dirty = false;
   }
 
