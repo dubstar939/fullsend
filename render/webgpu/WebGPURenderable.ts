@@ -4,8 +4,9 @@
  */
 
 import { WebGPUMesh } from './WebGPUMesh';
-import { MaterialData, DEFAULT_MATERIAL, TransformData, OBJECT_UNIFORM_SIZE } from '../../types/renderer.types';
+import { MaterialData, DEFAULT_MATERIAL, TransformData, OBJECT_UNIFORM_SIZE, BoundingSphere, LODConfig, DEFAULT_LOD_CONFIG } from '../../types/renderer.types';
 import { Transform } from '../common/Transform';
+import { createBoundingSphereFromVertices, distanceToSphereCenter, isSphereInFrustum, ViewFrustum } from '../common/Frustum';
 
 export class WebGPURenderable {
   private _id: string;
@@ -16,6 +17,14 @@ export class WebGPURenderable {
   private _castShadow: boolean;
   private _receiveShadow: boolean;
   
+  // Bounding volume for culling
+  private _boundingSphere: BoundingSphere | null = null;
+  
+  // LOD configuration
+  private _lodConfig: LODConfig;
+  private _currentLOD: number = 0;
+  private _lastLODDistance: number = -1;
+  
   // Uniform buffer for this object (created on demand)
   private _uniformBuffer: GPUBuffer | null = null;
   private _uniformData: Float32Array | null = null;
@@ -24,7 +33,8 @@ export class WebGPURenderable {
     id: string,
     mesh: WebGPUMesh,
     material: Partial<MaterialData> = {},
-    transform?: Transform
+    transform?: Transform,
+    lodConfig?: Partial<LODConfig>
   ) {
     this._id = id;
     this._mesh = mesh;
@@ -33,6 +43,15 @@ export class WebGPURenderable {
     this._visible = true;
     this._castShadow = false;
     this._receiveShadow = true;
+    
+    // Setup LOD config with defaults
+    this._lodConfig = {
+      distances: lodConfig?.distances ?? DEFAULT_LOD_CONFIG.distances,
+      lodMeshes: lodConfig?.lodMeshes,
+    };
+    
+    // Compute bounding sphere from mesh vertices
+    this._computeBoundingSphere();
   }
 
   get id(): string { return this._id; }
@@ -42,16 +61,82 @@ export class WebGPURenderable {
   get visible(): boolean { return this._visible; }
   get castShadow(): boolean { return this._castShadow; }
   get receiveShadow(): boolean { return this._receiveShadow; }
+  get boundingSphere(): BoundingSphere | null { return this._boundingSphere; }
+  get currentLOD(): number { return this._currentLOD; }
+  get lodConfig(): LODConfig { return this._lodConfig; }
 
   set visible(value: boolean) { this._visible = value; }
   set castShadow(value: boolean) { this._castShadow = value; }
   set receiveShadow(value: boolean) { this._receiveShadow = value; }
 
   /**
+   * Compute bounding sphere from mesh vertices.
+   */
+  private _computeBoundingSphere(): void {
+    const vertexData = this._mesh.getVertexData();
+    if (vertexData) {
+      this._boundingSphere = createBoundingSphereFromVertices(vertexData);
+    }
+  }
+
+  /**
    * Update material properties.
    */
   updateMaterial(updates: Partial<MaterialData>): void {
     this._material = { ...this._material, ...updates };
+  }
+
+  /**
+   * Set custom LOD configuration.
+   */
+  setLODConfig(config: Partial<LODConfig>): void {
+    if (config.distances) {
+      this._lodConfig.distances = config.distances;
+    }
+    if (config.lodMeshes) {
+      this._lodConfig.lodMeshes = config.lodMeshes;
+    }
+  }
+
+  /**
+   * Update LOD level based on distance to camera.
+   * Uses hysteresis to prevent popping.
+   */
+  updateLOD(cameraPosition: [number, number, number], hysteresis: number = 0.1): void {
+    if (!this._boundingSphere) return;
+    
+    // Calculate distance to camera
+    const distance = distanceToSphereCenter(cameraPosition, this._boundingSphere);
+    
+    // Determine appropriate LOD level
+    let targetLOD = 0;
+    for (let i = 0; i < this._lodConfig.distances.length; i++) {
+      if (distance >= this._lodConfig.distances[i]) {
+        targetLOD = i + 1;
+      }
+    }
+    
+    // Clamp to max available LOD levels
+    const maxLOD = this._lodConfig.lodMeshes 
+      ? this._lodConfig.lodMeshes.length - 1 
+      : this._lodConfig.distances.length;
+    targetLOD = Math.min(targetLOD, maxLOD);
+    
+    // Apply hysteresis to prevent LOD popping
+    const threshold = hysteresis * (this._lodConfig.distances[targetLOD] || Infinity);
+    const distanceDiff = Math.abs(distance - this._lastLODDistance);
+    
+    if (targetLOD !== this._currentLOD && distanceDiff > threshold) {
+      this._currentLOD = targetLOD;
+      this._lastLODDistance = distance;
+      
+      // Switch mesh if custom LOD meshes are provided
+      if (this._lodConfig.lodMeshes && this._lodConfig.lodMeshes[this._currentLOD]) {
+        this._mesh = this._lodConfig.lodMeshes[this._currentLOD];
+      }
+    } else if (targetLOD === this._currentLOD) {
+      this._lastLODDistance = distance;
+    }
   }
 
   /**
@@ -124,13 +209,26 @@ export class WebGPURenderable {
 
   /**
    * Check if this object should be rendered.
-   * TODO: Add frustum culling check here
+   * Performs frustum culling against bounding sphere.
    */
-  shouldBeRendered(cameraFrustum?: any): boolean {
+  shouldBeRendered(cameraFrustum?: ViewFrustum, cameraPosition?: [number, number, number]): boolean {
     if (!this._visible) return false;
     
-    // TODO: Implement frustum culling
-    // if (cameraFrustum && !cameraFrustum.intersectsMesh(this)) return false;
+    // Frustum culling check
+    if (cameraFrustum && this._boundingSphere) {
+      if (!isSphereInFrustum(cameraFrustum, this._boundingSphere)) {
+        return false;
+      }
+    }
+    
+    // Distance culling - if beyond all LOD thresholds, don't render
+    if (this._boundingSphere && cameraPosition) {
+      const distance = distanceToSphereCenter(cameraPosition, this._boundingSphere);
+      const maxDistance = this._lodConfig.distances[this._lodConfig.distances.length - 1];
+      if (distance > maxDistance) {
+        return false;
+      }
+    }
     
     return true;
   }

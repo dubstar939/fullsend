@@ -48,5 +48,37 @@
 1. **Low-Poly First**: Flat shading, minimal overdraw, efficient batch rendering
 2. **Data-Oriented**: Separate data (buffers) from behavior (renderer)
 3. **Explicit is Better**: Clear ownership of GPU resources
-4. **Extension Points**: TODOs for frustum culling, instancing, shadows, post-processing
+4. **Performance Optimizations**: Built-in frustum culling, LOD system, distance culling
 5. **Backend Agnostic**: Common types allow WebGL/WebGPU swap
+
+## Performance Features
+
+### Frustum Culling
+The renderer automatically extracts the view frustum from the camera's view-projection matrix and tests each renderable's bounding sphere against it. Objects outside the frustum are skipped during rendering.
+
+```typescript
+// Automatic in renderFrame() - no manual setup needed
+const frustum = camera.getFrustum(); // Cached extraction
+if (!renderable.shouldBeRendered(frustum, cameraPosition)) continue;
+```
+
+### Level of Detail (LOD)
+Each renderable can have configurable LOD thresholds. The system automatically switches between LOD levels based on camera distance with hysteresis to prevent popping.
+
+```typescript
+// Per-object LOD config
+const renderable = new WebGPURenderable(id, mesh, material, transform, {
+  distances: [20, 50, 100], // High/Medium/Low/Cull thresholds
+  lodMeshes: [highDetailMesh, mediumMesh, lowMesh] // Optional custom meshes
+});
+
+// Global LOD settings
+renderer.setLODSettings({
+  enabled: true,
+  defaultDistances: [30, 60, 100],
+  hysteresis: 0.1 // 10% hysteresis to prevent popping
+});
+```
+
+### Bounding Volumes
+Bounding spheres are automatically computed from mesh vertices at construction time. The sphere is transformed with the object for accurate culling.

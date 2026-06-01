@@ -11,10 +11,13 @@ import { WebGPUFrameGraph } from './WebGPUFrameGraph';
 import { WebGPURenderable } from './WebGPURenderable';
 import { WebGPUMesh, createCubeMesh, createPlaneMesh } from './WebGPUMesh';
 import { Camera } from '../common/Camera';
+import { ViewFrustum } from '../../types/renderer.types';
 import {
   RendererConfig,
   DEFAULT_RENDERER_CONFIG,
   LightingData,
+  GlobalLODSettings,
+  DEFAULT_GLOBAL_LOD_SETTINGS,
 } from '../../types/renderer.types';
 
 export interface WebGPURendererAPI {
@@ -24,6 +27,7 @@ export interface WebGPURendererAPI {
   removeRenderable(id: string): void;
   getRenderable(id: string): WebGPURenderable | undefined;
   setLighting(lighting: Partial<LightingData>): void;
+  setLODSettings(settings: Partial<GlobalLODSettings>): void;
   renderFrame(deltaTime: number): void;
   resize(width: number, height: number): void;
   dispose(): void;
@@ -38,6 +42,10 @@ export class WebGPURenderer implements WebGPURendererAPI {
   private _camera: Camera | null = null;
   private _renderables: Map<string, WebGPURenderable> = new Map();
   private _config: RendererConfig;
+  private _lodSettings: GlobalLODSettings;
+  
+  // Cached frustum for culling (updated per-frame)
+  private _frustum: ViewFrustum | null = null;
   
   // Depth texture for depth testing
   private _depthTexture: GPUTexture | null = null;
@@ -46,6 +54,7 @@ export class WebGPURenderer implements WebGPURendererAPI {
   constructor() {
     this._deviceManager = new WebGPUDeviceManager();
     this._config = { ...DEFAULT_RENDERER_CONFIG };
+    this._lodSettings = { ...DEFAULT_GLOBAL_LOD_SETTINGS };
   }
 
   /**
@@ -90,6 +99,13 @@ export class WebGPURenderer implements WebGPURendererAPI {
    */
   setCamera(camera: Camera): void {
     this._camera = camera;
+  }
+
+  /**
+   * Configure LOD settings globally.
+   */
+  setLODSettings(settings: Partial<GlobalLODSettings>): void {
+    this._lodSettings = { ...this._lodSettings, ...settings };
   }
 
   /**
@@ -142,10 +158,17 @@ export class WebGPURenderer implements WebGPURendererAPI {
     const device = this._deviceManager.getDevice();
     const { encoder, view } = this._deviceManager.beginFrame();
 
-    // Update camera uniforms
-    if (this._camera && this._frameGraph) {
+    // Update camera and extract frustum for culling
+    let frustum: ViewFrustum | null = null;
+    let cameraPosition: [number, number, number] | undefined = undefined;
+    
+    if (this._camera) {
       const uniforms = this._camera.getUniforms();
-      this._frameGraph.updateCameraUniforms(device, uniforms);
+      this._frameGraph!.updateCameraUniforms(device, uniforms);
+      
+      // Get frustum for culling
+      frustum = this._camera.getFrustum();
+      cameraPosition = this._camera.position as [number, number, number];
     }
 
     // Get render pass
@@ -161,9 +184,15 @@ export class WebGPURenderer implements WebGPURendererAPI {
     passEncoder.setPipeline(pipeline);
     passEncoder.setBindGroup(0, this._frameGraph!.getGlobalBindGroup()!);
 
-    // Draw all visible renderables
+    // Draw all visible renderables with culling
     for (const renderable of this._renderables.values()) {
-      if (!renderable.shouldBeRendered()) {
+      // Update LOD before visibility test
+      if (this._lodSettings.enabled && cameraPosition) {
+        renderable.updateLOD(cameraPosition, this._lodSettings.hysteresis);
+      }
+      
+      // Frustum and distance culling
+      if (!renderable.shouldBeRendered(frustum ?? undefined, cameraPosition)) {
         continue;
       }
 
