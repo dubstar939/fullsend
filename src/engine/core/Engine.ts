@@ -134,10 +134,16 @@ export class Engine {
       dirLight.shadow.mapSize.height = shadowMapSize;
       dirLight.shadow.camera.near = 0.5;
       dirLight.shadow.camera.far = 500;
-      dirLight.shadow.camera.left = -100;
-      dirLight.shadow.camera.right = 100;
-      dirLight.shadow.camera.top = 100;
-      dirLight.shadow.camera.bottom = -100;
+      
+      // Optimized shadow camera bounds for better performance
+      dirLight.shadow.camera.left = -50;
+      dirLight.shadow.camera.right = 50;
+      dirLight.shadow.camera.top = 50;
+      dirLight.shadow.camera.bottom = -50;
+      
+      // Reduce shadow bias issues
+      dirLight.shadow.bias = -0.0001;
+      dirLight.shadow.normalBias = 0.02;
     }
     
     this.scene.add(dirLight);
@@ -145,6 +151,26 @@ export class Engine {
     // Hemisphere light for sky/ground color variation
     const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3d5c3d, 0.4);
     this.scene.add(hemiLight);
+  }
+  
+  /**
+   * Update shadow camera to follow player for optimized shadow rendering
+   */
+  updateShadowCamera(playerPosition: THREE.Vector3): void {
+    const dirLight = this.scene.children.find(
+      (c) => c instanceof THREE.DirectionalLight && c.castShadow
+    ) as THREE.DirectionalLight;
+    
+    if (dirLight) {
+      // Position light to follow player
+      dirLight.position.set(
+        playerPosition.x + 50,
+        100,
+        playerPosition.z + 50
+      );
+      dirLight.target.position.copy(playerPosition);
+      dirLight.target.updateMatrixWorld();
+    }
   }
   
   /**

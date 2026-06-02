@@ -18,6 +18,9 @@ export class InstancedMeshManager {
   private freeIndices: number[] = [];
   private instanceData: Map<number, { matrix: THREE.Matrix4; color: THREE.Color }> = new Map();
   
+  // Cache objects to reduce allocations
+  private _dummyObject: THREE.Object3D;
+
   constructor(
     geometry: THREE.BufferGeometry,
     material: THREE.Material,
@@ -28,6 +31,9 @@ export class InstancedMeshManager {
     this.instancedMesh.count = config.initialCount ?? maxCount;
     this.activeCount = config.initialCount ?? maxCount;
     
+    // Initialize cache object for matrix calculations
+    this._dummyObject = new THREE.Object3D();
+
     // Initialize free indices
     for (let i = 0; i < maxCount; i++) {
       this.freeIndices.push(i);
@@ -114,15 +120,33 @@ export class InstancedMeshManager {
   ): void {
     if (!this.instanceData.has(index)) return;
     
-    const matrix = new THREE.Matrix4();
-    matrix.compose(
-      position,
-      rotation ? new THREE.Quaternion().setFromEuler(rotation) : new THREE.Quaternion(),
-      scale ?? new THREE.Vector3(1, 1, 1)
-    );
+    // Use cached dummy object to avoid allocations
+    this._dummyObject.position.copy(position);
+    if (rotation) {
+      this._dummyObject.rotation.copy(rotation);
+    } else {
+      this._dummyObject.rotation.set(0, 0, 0);
+    }
+    if (scale) {
+      this._dummyObject.scale.copy(scale);
+    } else {
+      this._dummyObject.scale.set(1, 1, 1);
+    }
+    this._dummyObject.updateMatrix();
+    
+    this.instancedMesh.setMatrixAt(index, this._dummyObject.matrix);
+    this.instanceData.get(index)!.matrix.copy(this._dummyObject.matrix);
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+  }
+  
+  /**
+   * Update an instance's transform using a pre-computed matrix (zero-allocation)
+   */
+  updateInstanceWithMatrix(index: number, matrix: THREE.Matrix4): void {
+    if (!this.instanceData.has(index)) return;
     
     this.instancedMesh.setMatrixAt(index, matrix);
-    this.instanceData.get(index)!.matrix = matrix;
+    this.instanceData.get(index)!.matrix.copy(matrix);
     this.instancedMesh.instanceMatrix.needsUpdate = true;
   }
   
