@@ -10,8 +10,11 @@ export type {
   VisualCategory,
   VisualPart,
   VinylLayer,
+  VinylLayerSave,
   VinylSet,
   CarBuild,
+  CarBuildSave,
+  GarageSave,
   InstalledUpgrades,
   InstalledVisuals,
   StatComparison,
@@ -50,3 +53,6 @@ export type { BattleImpact, StatTableData } from "./StatComparison";
 // Main Controller
 export { CustomizationController } from "./CustomizationController";
 export type { CustomizationControllerOptions } from "./CustomizationController";
+
+// Garage System
+export { GarageManager } from "../garage/GarageManager";
