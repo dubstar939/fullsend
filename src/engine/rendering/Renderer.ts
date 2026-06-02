@@ -25,7 +25,8 @@ export class Renderer {
     });
     
     // Configure renderer for low-poly style
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Cap pixel ratio at 1.5 for better mobile performance
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x87ceeb, 1);
     
@@ -33,6 +34,7 @@ export class Renderer {
     if (config.shadowQuality !== 'off') {
       this.renderer.shadowMap.enabled = true;
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      this.renderer.shadowMap.autoUpdate = false; // Manual control for better performance
     }
     
     // Output encoding
@@ -52,7 +54,20 @@ export class Renderer {
    * Render the scene
    */
   render(scene: THREE.Scene, camera: THREE.Camera): void {
+    // Update shadow maps manually when autoUpdate is disabled
+    if (this.config.shadowQuality !== 'off') {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     this.renderer.render(scene, camera);
+  }
+  
+  /**
+   * Manually update shadow maps
+   */
+  updateShadows(): void {
+    if (this.config.shadowQuality !== 'off') {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
   }
   
   /**
