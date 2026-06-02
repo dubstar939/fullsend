@@ -15,6 +15,9 @@ import { Profiler } from './Profiler';
 import { DebugHUD, DebugHUDConfig } from './ui/DebugHUD';
 import { LowPolyArtDirector } from '../../art/LowPolyArtDirector';
 
+// Gameplay Systems (optional imports - only used if gameplay is enabled)
+import { ProjectileManager, WaveManager, AIManager, WaypointGraph, Spawner } from '../../gameplay';
+
 export interface EngineConfig {
   /** Target FPS for the game loop */
   targetFPS: number;
@@ -55,6 +58,10 @@ export interface EngineStats {
   instancesRendered: number;
   staticObjects: number;
   dynamicObjects: number;
+  // Gameplay stats
+  activeProjectiles?: number;
+  activeAIAgents?: number;
+  currentWave?: number;
 }
 
 export class Engine {
@@ -75,6 +82,13 @@ export class Engine {
   private lastFrameTime: number = 0;
   private accumulator: number = 0;
   private onFrameCallback?: (deltaTime: number) => void;
+  
+  // Gameplay systems (optional, initialized by user)
+  public projectileManager?: ProjectileManager;
+  public aiManager?: AIManager;
+  public waveManager?: WaveManager;
+  public waypointGraph?: WaypointGraph;
+  public spawner?: Spawner;
   
   constructor(
     canvas: HTMLCanvasElement,
@@ -264,6 +278,9 @@ export class Engine {
       this.lodSystem.update(this.sceneGraph, this.cameraSystem.camera);
     }
     
+    // Update gameplay systems
+    this.updateGameplaySystems(deltaTime);
+    
     // Call user frame callback
     if (this.onFrameCallback) {
       this.onFrameCallback(deltaTime);
@@ -272,6 +289,38 @@ export class Engine {
     // Update renderer stats in profiler
     this.profiler.setDrawCalls(this.renderer.getDrawCalls());
     this.profiler.setTriangles(this.renderer.getTriangleCount());
+  }
+
+  /**
+   * Update all gameplay systems (projectiles, AI, waves)
+   */
+  private updateGameplaySystems(deltaTime: number): void {
+    // Update projectile manager
+    if (this.projectileManager) {
+      this.projectileManager.update(deltaTime);
+    }
+    
+    // Update AI manager
+    if (this.aiManager) {
+      this.aiManager.update(deltaTime);
+    }
+    
+    // Update wave manager
+    if (this.waveManager) {
+      this.waveManager.update(deltaTime);
+      
+      // Sync wave stat to profiler
+      const waveState = this.waveManager.getWaveState();
+      this.profiler.currentWave = waveState.currentWave;
+    }
+    
+    // Sync gameplay stats to profiler
+    if (this.projectileManager) {
+      this.profiler.activeProjectiles = this.projectileManager.getActiveCount();
+    }
+    if (this.aiManager) {
+      this.profiler.activeAIAgents = this.aiManager.getActiveCount();
+    }
   }
   
   /**
@@ -323,6 +372,10 @@ export class Engine {
       instancesRendered: profilerStats.instancesRendered,
       staticObjects: profilerStats.staticObjects,
       dynamicObjects: profilerStats.dynamicObjects,
+      // Gameplay stats from profiler
+      activeProjectiles: profilerStats.activeProjectiles,
+      activeAIAgents: profilerStats.activeAIAgents,
+      currentWave: profilerStats.currentWave,
     };
   }
   
