@@ -21,6 +21,17 @@ export interface UpgradeSlots {
   cooling: boolean;
 }
 
+export type VisualSlot = 
+  | "bodyColor" 
+  | "vinyl" 
+  | "frontBumper" 
+  | "rearBumper" 
+  | "sideSkirts" 
+  | "spoiler" 
+  | "hood" 
+  | "wheels" 
+  | "exhaust";
+
 export interface VisualSlots {
   bodyColor: boolean;
   vinyl: boolean;
@@ -68,4 +79,101 @@ export interface UpgradePart {
   cost: number;
   statModifiers: Partial<CarStats>;
   rarity: UpgradeRarity;
+}
+
+// Visual Part Types
+export type VisualCategory = 
+  | "frontBumper" 
+  | "rearBumper" 
+  | "sideSkirts" 
+  | "spoiler" 
+  | "hood" 
+  | "wheels" 
+  | "exhaust";
+
+export interface VisualPart {
+  id: string;
+  name: string;
+  category: VisualCategory | "bodyColor";
+  cost: number;
+  rarity: UpgradeRarity;
+  meshId?: string;
+  textureId?: string;
+  colorHex?: string;
+}
+
+// Vinyl System Types
+export interface VinylLayer {
+  id: string;
+  texture: string;
+  position: { x: number; y: number };
+  scale: number;
+  rotation: number;
+  color: string;
+  opacity: number;
+}
+
+export interface VinylSet {
+  id: string;
+  name: string;
+  layers: VinylLayer[];
+}
+
+// Car Build Types
+export interface InstalledUpgrades {
+  engine?: UpgradePart;
+  transmission?: UpgradePart;
+  suspension?: UpgradePart;
+  tires?: UpgradePart;
+  weightReduction?: UpgradePart;
+  cooling?: UpgradePart;
+  turbo?: UpgradePart;
+  intake?: UpgradePart;
+  exhaust?: UpgradePart;
+  ecu?: UpgradePart;
+}
+
+export interface InstalledVisuals {
+  bodyColor?: string;
+  vinyl?: VinylLayer[];
+  frontBumper?: VisualPart | null;
+  rearBumper?: VisualPart | null;
+  sideSkirts?: VisualPart | null;
+  spoiler?: VisualPart | null;
+  hood?: VisualPart | null;
+  wheels?: VisualPart | null;
+  exhaust?: VisualPart | null;
+}
+
+export interface CarBuild {
+  carId: string;
+  installedUpgrades: InstalledUpgrades;
+  installedVisuals: InstalledVisuals;
+  savedAt?: Date;
+}
+
+// Customization UI State
+export type CustomizationState =
+  | "main"
+  | "performance"
+  | "visual"
+  | "vinyl"
+  | "colorPicker"
+  | "confirm";
+
+// Stat Comparison Types
+export interface StatComparison {
+  stat: keyof CarStats;
+  before: number;
+  after: number;
+  delta: number;
+}
+
+// Color Finish Types
+export type ColorFinishType = "solid" | "metallic" | "pearlescent" | "matte";
+
+export interface ColorOption {
+  hex: string;
+  name: string;
+  finishType: ColorFinishType;
 }
