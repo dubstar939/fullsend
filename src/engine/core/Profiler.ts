@@ -26,6 +26,12 @@ export interface FrameStats {
   triangles: number;
   /** Frame time in milliseconds */
   frameTimeMs: number;
+  /** Number of active projectiles (gameplay metric) */
+  activeProjectiles?: number;
+  /** Number of active AI agents (gameplay metric) */
+  activeAIAgents?: number;
+  /** Current wave number (gameplay metric) */
+  currentWave?: number;
 }
 
 export interface ProfilerConfig {
@@ -55,6 +61,11 @@ export class Profiler {
   private dynamicObjects: number = 0;
   private triangles: number = 0;
   private frameTimeMs: number = 0;
+  
+  // Gameplay stats (optional, set by gameplay systems)
+  public activeProjectiles?: number;
+  public activeAIAgents?: number;
+  public currentWave?: number;
   
   // Timing
   private frameStartTime: number = 0;
@@ -186,6 +197,8 @@ export class Profiler {
     this.instancesRendered = 0;
     this.objectsCulled = 0;
     this.triangles = 0;
+    // Note: gameplay stats (activeProjectiles, activeAIAgents, currentWave)
+    // are NOT reset here - they are set by gameplay systems each frame
   }
   
   /**
@@ -204,6 +217,9 @@ export class Profiler {
       dynamicObjects: this.dynamicObjects,
       triangles: this.triangles,
       frameTimeMs: Math.round(this.frameTimeMs * 100) / 100,
+      activeProjectiles: this.activeProjectiles,
+      activeAIAgents: this.activeAIAgents,
+      currentWave: this.currentWave,
     };
   }
   
