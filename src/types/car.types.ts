@@ -69,3 +69,40 @@ export interface UpgradePart {
   statModifiers: Partial<CarStats>;
   rarity: UpgradeRarity;
 }
+
+// Visual Mod System Types
+export type VisualSlot =
+  | "bodyColor"
+  | "vinyl"
+  | "frontBumper"
+  | "rearBumper"
+  | "sideSkirts"
+  | "spoiler"
+  | "hood"
+  | "wheels"
+  | "exhaust";
+
+export interface VisualPart {
+  id: string;
+  name: string;
+  slot: VisualSlot;
+
+  // Mesh overrides
+  meshOverride?: string; // swaps model part
+
+  // Texture overrides
+  textureOverride?: string; // vinyls, decals
+
+  // Color override
+  color?: string; // hex or RGB
+
+  // Optional metadata
+  rarity?: UpgradeRarity;
+}
+
+// Car Build System - combines upgrades and visuals
+export interface CarBuild {
+  carId: string;
+  installedUpgrades: Record<UpgradeCategory, UpgradePart | null>;
+  installedVisuals: Record<VisualSlot, VisualPart | null>;
+}
