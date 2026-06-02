@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { TRACK_CONFIG, TRAFFIC_CONFIG } from '../config/gameConfig';
+import { ZoneManager, ZoneType } from './ZoneManager';
 
 export enum SegmentType {
   STRAIGHT = 'STRAIGHT',
@@ -28,6 +29,7 @@ export interface HighwaySegment {
   laneWidth: number;
   isActive: boolean;
   batchId?: number;
+  zoneId?: string;
 }
 
 export interface HighwayLoopConfig {
@@ -79,6 +81,13 @@ export class HighwayLoopManager {
       color: 0x888888,
       flatShading: true,
     });
+  }
+
+  /**
+   * Set zone manager for zone-based segment properties
+   */
+  setZoneManager(zoneManager: ZoneManager): void {
+    this.zoneManager = zoneManager;
   }
 
   /**
