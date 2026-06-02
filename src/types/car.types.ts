@@ -113,6 +113,15 @@ export interface VinylLayer {
   opacity: number;
 }
 
+// Vinyl layer save format (serializable)
+export interface VinylLayerSave {
+  id: string;
+  texture: string;
+  transform: { x: number; y: number; scale: number; rotation: number };
+  color: string;
+  opacity: number;
+}
+
 export interface VinylSet {
   id: string;
   name: string;
@@ -150,6 +159,29 @@ export interface CarBuild {
   installedUpgrades: InstalledUpgrades;
   installedVisuals: InstalledVisuals;
   savedAt?: Date;
+  mileage: number;
+  lastUsed: number; // timestamp
+}
+
+// Garage Save System Types
+export interface CarBuildSave {
+  id: string; // unique build ID
+  carId: string; // base car model
+  name: string; // user-given name
+
+  installedUpgrades: Record<string, string | null>; // upgradePartId by category
+  installedVisuals: Record<string, string | null>; // visualPartId by slot
+
+  bodyColor: string; // hex
+  vinylLayers: VinylLayerSave[];
+
+  mileage: number;
+  lastUsed: number; // timestamp
+}
+
+export interface GarageSave {
+  builds: CarBuildSave[];
+  activeBuildId: string | null;
 }
 
 // Customization UI State
