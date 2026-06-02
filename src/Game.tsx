@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { createCarMesh, createRoadSegment, createTrafficVehicle, createPoliceCar } from './models';
 import { PHYSICS_CONFIG, TRAFFIC_CONFIG } from './constants';
-import startMenuBg from "./art/fullsendstartmenu.png";
+
 
 interface GameProps {
   onGameOver: (score: number, coins: number) => void;
