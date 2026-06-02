@@ -7,6 +7,12 @@
 export { Engine } from './core/Engine';
 export type { EngineConfig, EngineStats } from './core/Engine';
 
+// Profiling & Debug
+export { Profiler } from './core/Profiler';
+export type { FrameStats, ProfilerConfig } from './core/Profiler';
+export { DebugHUD } from './ui/DebugHUD';
+export type { DebugHUDConfig } from './ui/DebugHUD';
+
 // Rendering Pipeline
 export { Renderer } from './rendering/Renderer';
 export { LowPolyMaterial } from './rendering/LowPolyMaterial';
@@ -18,7 +24,6 @@ export type { SceneNode, SceneNodeType } from './core/SceneGraph';
 
 // Asset Management
 export { AssetLoader } from './assets/AssetLoader';
-export { AssetBundle } from './assets/AssetBundle';
 export type { AssetManifest, LoadedAssets } from './assets/AssetLoader';
 
 // Systems
