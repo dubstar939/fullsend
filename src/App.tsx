@@ -3,7 +3,7 @@ import { Play, Car, Trophy, Coins, ArrowLeft, Home, RotateCcw as Replay } from '
 import Game from './Game';
 import { INITIAL_CARS, CarStats } from './constants';
 
-type Screen = 'MENU' | 'GARAGE' | 'PLAYING' | 'GAMEOVER';
+type Screen = 'MENU' | 'GARAGE' | 'PLAYING' | 'GAMEOVER' | 'LOADING';
 
 interface GameState {
   coins: number;
@@ -71,6 +71,9 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-screen bg-black overflow-hidden font-sans select-none">
+      {screen === 'LOADING' && (
+        <LoadingScreen onLoadComplete={() => setScreen('MENU')} />
+      )}
       {screen === 'MENU' && (
         <Menu 
           coins={gameState.coins} 
@@ -118,7 +121,7 @@ interface MenuProps {
 const Menu: React.FC<MenuProps> = ({ coins, highScore, onStart, onGarage }) => (
   <div className="flex flex-col items-center justify-center h-full bg-slate-900 text-white space-y-8 p-4">
     <h1 className="text-6xl font-black italic tracking-tighter text-yellow-400 drop-shadow-xl">
-      TRAFFIC JAM 3D
+      FULL SEND HIGHWAY BATTLE
     </h1>
     
     <div className="grid grid-cols-1 gap-4 w-64">
@@ -249,5 +252,37 @@ const GameOver: React.FC<GameOverProps> = ({ score, onRetry, onMenu }) => (
     </div>
   </div>
 );
+
+interface LoadingScreenProps {
+  onLoadComplete: () => void;
+}
+
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ onLoadComplete }) => {
+  useEffect(() => {
+    // Simulate loading time, then transition to menu
+    const timer = setTimeout(() => {
+      onLoadComplete();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onLoadComplete]);
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full bg-black">
+      <img 
+        src="https://drive.google.com/thumbnail?id=1LfUhUF1JFq_1jm71N3hRHWPZIVubFgcF&sz=w1920"
+        alt="FULL SEND HIGHWAY BATTLE"
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-white text-center">
+        <div className="text-4xl font-black italic tracking-wider mb-4 animate-pulse">LOADING...</div>
+        <div className="flex gap-2 justify-center">
+          <div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+          <div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default App;

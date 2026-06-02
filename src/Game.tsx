@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { createCarMesh, createRoadSegment } from './models';
+import { createCarMesh, createRoadSegment, createTrafficVehicle, createPoliceCar } from './models';
 import { PHYSICS_CONFIG, TRAFFIC_CONFIG } from './constants';
 
 interface GameProps {
@@ -141,7 +141,16 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
     
     const spawnTraffic = () => {
       const lane = Math.floor(Math.random() * 4) - 1.5;
-      const trafficCar = createCarMesh(Math.random() > 0.5 ? '#999999' : '#ffffff');
+      const vehicleClasses = Object.keys(TRAFFIC_CONFIG.VEHICLE_CLASSES) as (keyof typeof TRAFFIC_CONFIG.VEHICLE_CLASSES)[];
+      const randomClass = vehicleClasses[Math.floor(Math.random() * vehicleClasses.length)];
+      
+      let trafficCar: THREE.Group;
+      if (randomClass === 'POLICE') {
+        trafficCar = createPoliceCar();
+      } else {
+        trafficCar = createTrafficVehicle(randomClass);
+      }
+      
       trafficCar.position.set(lane * 4, 0, gameStateRef.current.playerZ - 100);
       scene.add(trafficCar);
       gameStateRef.current.traffic.push({
