@@ -1,13 +1,15 @@
 /**
  * Rival Spawner
  * Manages rival AI spawning with zone-based tables, club definitions, and time conditions
- * Integrates with AIManager and renderer for Tokyo Xtreme Racer-style encounters
+ * Integrates with AIManager, renderer, and ClubManager for Tokyo Xtreme Racer-style encounters
  */
 
 import * as THREE from 'three';
 import { RIVAL_CONFIG, TRAFFIC_CONFIG } from '../config/gameConfig';
 import { ZoneManager, ZoneDefinition, ClubInfo } from './ZoneManager';
 import { InstancedMeshManager } from '../engine/rendering/InstancedMeshManager';
+import { ClubManager, clubManager as defaultClubManager } from './ClubManager';
+import { RivalDefinition as ClubRivalDefinition, PlayerState, RivalRole } from '../types/ClubSystem';
 
 export enum RivalType {
   CRUISER = 'CRUISER',       // Normal cruising rival
@@ -19,13 +21,10 @@ export enum RivalType {
   BOSS = 'BOSS',             // Club leader
 }
 
-export interface RivalDefinition {
-  id: string;
-  name: string;
+// Extended rival definition that includes club system data
+export interface RivalDefinition extends ClubRivalDefinition {
   type: RivalType;
   difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'EXTREME';
-  clubId?: string;
-  minReputation?: number;
   speedModifier: number;
   aggressionModifier: number;
   skillModifier: number;
