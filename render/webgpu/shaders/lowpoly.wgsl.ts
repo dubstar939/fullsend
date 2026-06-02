@@ -4,6 +4,7 @@
  * - Flat or smooth shading toggle
  * - Directional + ambient lighting
  * - Vertex colors support
+ * - GPU Instancing support
  * - Simple Lambert diffuse + ambient
  */
 
@@ -35,6 +36,12 @@ struct ObjectUniforms {
   wireframe: f32,
 };
 
+// Instance data for GPU instancing
+struct InstanceData {
+  modelMatrix: mat4x4<f32>,
+  color: vec4<f32>,
+};
+
 // Vertex input for low-poly meshes
 struct VertexInput {
   @location(0) position: vec3<f32>,
@@ -51,6 +58,7 @@ struct VertexOutput {
   @location(2) uv: vec2<f32>,
   @location(3) color: vec4<f32>,
   @location(4) flatNormal: vec3<f32>,
+  @location(5) instanceColor: vec4<f32>,
 };
 
 // ============================================================================
@@ -74,7 +82,7 @@ ${SHARED_WGSL}
 @group(1) @binding(0) var<uniform> objectUniforms: ObjectUniforms;
 
 // ============================================================================
-// VERTEX SHADER
+// VERTEX SHADER (Non-instanced)
 // ============================================================================
 
 @vertex
@@ -102,6 +110,60 @@ fn vertexMain(
   output.uv = uv;
   output.color = color;
   output.flatNormal = worldNormal;
+  output.instanceColor = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  
+  return output;
+}
+
+// ============================================================================
+// VERTEX SHADER (Instanced)
+// ============================================================================
+
+@vertex
+fn vertexMainInstanced(
+  @location(0) position: vec3<f32>,
+  @location(1) normal: vec3<f32>,
+  @location(2) uv: vec2<f32>,
+  @location(3) color: vec4<f32>,
+  @location(4) instanceModelRow0: vec4<f32>,
+  @location(5) instanceModelRow1: vec4<f32>,
+  @location(6) instanceModelRow2: vec4<f32>,
+  @location(7) instanceModelRow3: vec4<f32>,
+  @location(8) instanceColor: vec4<f32>
+) -> VertexOutput {
+  
+  // Reconstruct model matrix from instance attributes
+  let instanceModelMatrix = mat4x4<f32>(
+    instanceModelRow0,
+    instanceModelRow1,
+    instanceModelRow2,
+    instanceModelRow3
+  );
+  
+  // Transform position to world space using instance matrix
+  let worldPosition = instanceModelMatrix * vec4<f32>(position, 1.0);
+  
+  // Transform to clip space
+  let viewPosition = cameraUniforms.viewMatrix * worldPosition;
+  let clipPosition = cameraUniforms.projectionMatrix * viewPosition;
+  
+  // Transform normal to world space (using upper 3x3 of instance matrix)
+  let normalMatrix = mat4x4<f32>(
+    instanceModelRow0,
+    instanceModelRow1,
+    instanceModelRow2,
+    vec4<f32>(0.0, 0.0, 0.0, 1.0)
+  );
+  let worldNormal = normalize((normalMatrix * vec4<f32>(normal, 0.0)).xyz);
+  
+  var output: VertexOutput;
+  output.clipPosition = clipPosition;
+  output.worldPosition = worldPosition.xyz;
+  output.worldNormal = worldNormal;
+  output.uv = uv;
+  output.color = color;
+  output.flatNormal = worldNormal;
+  output.instanceColor = instanceColor;
   
   return output;
 }
@@ -116,15 +178,16 @@ fn fragmentMain(
   @interpolate(perspective) worldNormal: vec3<f32>,
   @interpolate(perspective) uv: vec2<f32>,
   @interpolate(perspective) color: vec4<f32>,
-  @interpolate(flat) flatNormal: vec3<f32>
+  @interpolate(flat) flatNormal: vec3<f32>,
+  @interpolate(perspective) instanceColor: vec4<f32>
 ) -> @location(0) vec4<f32> {
   
   // Use flat normal if flatShading is enabled
   let normal = select(worldNormal, flatNormal, objectUniforms.flatShading > 0.5);
   let normalizedNormal = normalize(normal);
   
-  // Base color from vertex color or material color
-  var baseColor = objectUniforms.color.rgb * color.rgb;
+  // Base color from vertex color, material color, and instance color
+  var baseColor = objectUniforms.color.rgb * color.rgb * instanceColor.rgb;
   
   // Directional light
   let lightDir = normalize(-lightingUniforms.lightDirection.xyz);
@@ -145,7 +208,7 @@ fn fragmentMain(
   var finalColor = (diffuse + ambient) * baseColor + emissive;
   
   // Apply vertex color alpha
-  let alpha = objectUniforms.color.a * color.a;
+  let alpha = objectUniforms.color.a * color.a * instanceColor.a;
   
   // Wireframe mode (simple grid overlay)
   if (objectUniforms.wireframe > 0.5) {
