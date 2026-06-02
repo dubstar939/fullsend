@@ -11,7 +11,8 @@ import { InputSystem } from '../systems/InputSystem';
 import { CameraSystem } from '../systems/CameraSystem';
 import { CullingSystem } from '../systems/CullingSystem';
 import { LODSystem } from '../systems/LODSystem';
-import { PerformanceMonitor } from './PerformanceMonitor';
+import { Profiler } from './Profiler';
+import { DebugHUD, DebugHUDConfig } from './ui/DebugHUD';
 import { LowPolyArtDirector } from '../../art/LowPolyArtDirector';
 
 export interface EngineConfig {
@@ -31,6 +32,10 @@ export interface EngineConfig {
   enableLOD: boolean;
   /** Debug mode */
   debug: boolean;
+  /** Enable profiler (default: false for zero overhead) */
+  enableProfiler: boolean;
+  /** Debug HUD configuration */
+  debugHUD?: Partial<DebugHUDConfig>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -38,12 +43,18 @@ const _unusedConfigCheck = (_cfg: EngineConfig) => {};
 
 export interface EngineStats {
   fps: number;
+  avgFps: number;
+  minFps: number;
+  maxFps: number;
   frameTime: number;
   drawCalls: number;
   triangleCount: number;
   textureMemoryMB: number;
   activeObjects: number;
   culledObjects: number;
+  instancesRendered: number;
+  staticObjects: number;
+  dynamicObjects: number;
 }
 
 export class Engine {
@@ -57,7 +68,8 @@ export class Engine {
   public readonly lodSystem: LODSystem;
   public readonly artDirector: LowPolyArtDirector;
   
-  private readonly performanceMonitor: PerformanceMonitor;
+  private readonly profiler: Profiler;
+  private debugHUD?: DebugHUD;
   private config: EngineConfig;
   private isRunning: boolean = false;
   private lastFrameTime: number = 0;
@@ -77,6 +89,7 @@ export class Engine {
       enableCulling: true,
       enableLOD: true,
       debug: false,
+      enableProfiler: false,
       ...config,
     };
 
@@ -107,8 +120,15 @@ export class Engine {
     // Initialize art director
     this.artDirector = new LowPolyArtDirector();
     
-    // Initialize performance monitor
-    this.performanceMonitor = new PerformanceMonitor();
+    // Initialize profiler (only if enabled)
+    this.profiler = new Profiler({
+      enabled: this.config.enableProfiler,
+    });
+    
+    // Initialize debug HUD if configured
+    if (this.config.debug || this.config.debugHUD?.visible) {
+      this.setupDebugHUD();
+    }
     
     // Setup default lighting
     this.setupDefaultLighting();
@@ -210,7 +230,7 @@ export class Engine {
     }
     
     this.render();
-    this.performanceMonitor.endFrame();
+    this.profiler.endFrame();
     
     requestAnimationFrame(this.gameLoop);
   };
@@ -219,8 +239,9 @@ export class Engine {
    * Update all systems
    */
   private update(deltaTime: number): void {
-    // Update performance metrics
-    this.performanceMonitor.beginFrame();
+    // Start profiling frame
+    this.profiler.beginFrame();
+    this.profiler.resetFrameCounters();
     
     // Update input
     this.inputSystem.update(deltaTime);
@@ -234,6 +255,8 @@ export class Engine {
     // Perform culling if enabled
     if (this.config.enableCulling) {
       this.cullingSystem.update(this.sceneGraph);
+      // Report culled count to profiler
+      this.profiler.setObjectsCulled(this.cullingSystem.getCulledCount());
     }
     
     // Update LODs if enabled
@@ -245,6 +268,10 @@ export class Engine {
     if (this.onFrameCallback) {
       this.onFrameCallback(deltaTime);
     }
+    
+    // Update renderer stats in profiler
+    this.profiler.setDrawCalls(this.renderer.getDrawCalls());
+    this.profiler.setTriangles(this.renderer.getTriangleCount());
   }
   
   /**
@@ -281,14 +308,21 @@ export class Engine {
    * Get current engine statistics
    */
   getStats(): EngineStats {
+    const profilerStats = this.profiler.getStats();
     return {
-      fps: this.performanceMonitor.getFPS(),
-      frameTime: this.performanceMonitor.getFrameTime(),
-      drawCalls: this.renderer.getDrawCalls(),
-      triangleCount: this.renderer.getTriangleCount(),
+      fps: profilerStats.fps,
+      avgFps: profilerStats.avgFps,
+      minFps: profilerStats.minFps,
+      maxFps: profilerStats.maxFps,
+      frameTime: profilerStats.frameTimeMs,
+      drawCalls: profilerStats.drawCalls,
+      triangleCount: profilerStats.triangles,
       textureMemoryMB: this.renderer.getTextureMemoryMB(),
       activeObjects: this.sceneGraph.getActiveCount(),
-      culledObjects: this.cullingSystem.getCulledCount(),
+      culledObjects: profilerStats.objectsCulled,
+      instancesRendered: profilerStats.instancesRendered,
+      staticObjects: profilerStats.staticObjects,
+      dynamicObjects: profilerStats.dynamicObjects,
     };
   }
   
@@ -306,6 +340,70 @@ export class Engine {
   setDebugMode(enabled: boolean): void {
     this.config.debug = enabled;
     this.renderer.setDebugMode(enabled);
+    
+    // Setup or teardown debug HUD based on mode
+    if (enabled && !this.debugHUD) {
+      this.setupDebugHUD();
+    } else if (!enabled && this.debugHUD) {
+      this.debugHUD.dispose();
+      this.debugHUD = undefined;
+    }
+  }
+  
+  /**
+   * Setup debug HUD
+   */
+  private setupDebugHUD(): void {
+    if (this.debugHUD) return;
+    
+    // Enable profiler for HUD
+    this.profiler.setEnabled(true);
+    
+    this.debugHUD = new DebugHUD(this.profiler, {
+      visible: true,
+      ...this.config.debugHUD,
+    });
+    this.debugHUD.mount();
+  }
+  
+  /**
+   * Toggle debug HUD visibility
+   */
+  toggleDebugHUD(): void {
+    if (this.debugHUD) {
+      this.debugHUD.toggle();
+    } else {
+      this.setupDebugHUD();
+    }
+  }
+  
+  /**
+   * Get the profiler instance
+   */
+  getProfiler(): Profiler {
+    return this.profiler;
+  }
+  
+  /**
+   * Get the debug HUD instance
+   */
+  getDebugHUD(): DebugHUD | undefined {
+    return this.debugHUD;
+  }
+  
+  /**
+   * Set object counts for profiling (call when adding/removing objects)
+   */
+  setObjectCounts(staticCount: number, dynamicCount: number): void {
+    this.profiler.setStaticObjects(staticCount);
+    this.profiler.setDynamicObjects(dynamicCount);
+  }
+  
+  /**
+   * Add to instances rendered count (call from instanced mesh managers)
+   */
+  addInstancesRendered(count: number): void {
+    this.profiler.addInstancesRendered(count);
   }
   
   /**
@@ -317,5 +415,10 @@ export class Engine {
     this.assetLoader.dispose();
     this.sceneGraph.dispose();
     this.inputSystem.dispose();
+    this.profiler.dispose();
+    if (this.debugHUD) {
+      this.debugHUD.dispose();
+      this.debugHUD = undefined;
+    }
   }
 }
