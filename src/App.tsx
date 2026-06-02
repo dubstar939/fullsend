@@ -120,7 +120,7 @@ interface MenuProps {
 
 const Menu: React.FC<MenuProps> = ({ coins, highScore, onStart, onGarage }) => (
  <div
-  className="start-menu"
+
   style={{
     backgroundImage: `url(${startMenuBg})`,
     backgroundSize: "cover",
