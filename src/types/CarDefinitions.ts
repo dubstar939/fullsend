@@ -1,27 +1,6 @@
 // CarDefinitions.ts
 import { CarDefinition } from "./car.types";
-
-// Shared slot definitions
-export const fullSlots = {
-  engine: true,
-  transmission: true,
-  suspension: true,
-  tires: true,
-  weightReduction: true,
-  cooling: true
-};
-
-export const fullVisuals = {
-  bodyColor: true,
-  vinyl: true,
-  frontBumper: true,
-  rearBumper: true,
-  sideSkirts: true,
-  spoiler: true,
-  hood: true,
-  wheels: true,
-  exhaust: true
-};
+import { fullSlots, fullVisuals } from "./UpgradeSystem";
 
 export const CAR_DEFINITIONS: CarDefinition[] = [
   // Original cars

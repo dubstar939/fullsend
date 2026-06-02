@@ -44,3 +44,28 @@ export interface CarDefinition {
   upgradeSlots: UpgradeSlots;
   visualSlots: VisualSlots;
 }
+
+// Upgrade System Types
+export type UpgradeCategory =
+  | "engine"
+  | "turbo"
+  | "intake"
+  | "exhaust"
+  | "transmission"
+  | "suspension"
+  | "tires"
+  | "weightReduction"
+  | "cooling"
+  | "ecu";
+
+export type UpgradeRarity = "common" | "rare" | "legendary";
+
+export interface UpgradePart {
+  id: string;
+  name: string;
+  category: UpgradeCategory;
+  level: number;
+  cost: number;
+  statModifiers: Partial<CarStats>;
+  rarity: UpgradeRarity;
+}
