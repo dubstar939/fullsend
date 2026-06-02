@@ -17,12 +17,14 @@ export class WebGPUMesh {
   private _indexCount: number;
   private _indexFormat: GPUIndexFormat;
   private _bufferManager: WebGPUBufferManager;
+  private _vertexData: MeshData | null = null; // Keep reference for batch merging
 
   constructor(
     bufferManager: WebGPUBufferManager,
     data: MeshData
   ) {
     this._bufferManager = bufferManager;
+    this._vertexData = data; // Store for later access
 
     // Create vertex buffer
     this._vertexBuffer = bufferManager.createVertexBuffer(data.vertices.buffer);
@@ -73,6 +75,13 @@ export class WebGPUMesh {
   }
 
   /**
+   * Get the original vertex data (for static batching).
+   */
+  getVertexData(): MeshData | null {
+    return this._vertexData;
+  }
+
+  /**
    * Update vertex data (for dynamic meshes).
    * Note: This assumes the new data fits in the existing buffer.
    */
@@ -80,11 +89,17 @@ export class WebGPUMesh {
     if (vertices.byteLength > this._vertexBuffer.size) {
       console.warn('[Mesh] New vertex data exceeds buffer size. Creating new buffer.');
       this._vertexBuffer = this._bufferManager.createVertexBuffer(vertices.buffer);
+      if (this._vertexData) {
+        this._vertexData.vertices = vertices;
+      }
     } else {
       this._bufferManager.updateUniformBuffer(
         this._vertexBuffer.buffer,
         vertices.buffer
       );
+      if (this._vertexData) {
+        this._vertexData.vertices = vertices;
+      }
     }
   }
 
@@ -94,6 +109,7 @@ export class WebGPUMesh {
   dispose(): void {
     this._bufferManager.destroyBuffer(this._vertexBuffer);
     this._bufferManager.destroyBuffer(this._indexBuffer);
+    this._vertexData = null;
   }
 }
 

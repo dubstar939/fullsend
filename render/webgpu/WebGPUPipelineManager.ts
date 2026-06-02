@@ -5,6 +5,7 @@
 
 import { LOWPOLY_SHADER_WGSL } from './shaders/lowpoly.wgsl';
 import { LOWPOLY_VERTEX_LAYOUT, LOWPOLY_VERTEX_STRIDE } from '../../types/renderer.types';
+import { INSTANCE_VERTEX_LAYOUT, INSTANCE_STRIDE } from './WebGPUInstancing';
 
 export interface PipelineConfig {
   primitive: GPUPrimitiveState;
@@ -104,6 +105,7 @@ export class WebGPUPipelineManager {
     cullMode?: GPUCullMode;
     depthWriteEnabled?: boolean;
     compareFunction?: GPUCompareFunction;
+    instanced?: boolean; // Enable instanced rendering
   } = {}): GPURenderPipeline {
     const key = JSON.stringify(config);
     
@@ -124,27 +126,45 @@ export class WebGPUPipelineManager {
     cullMode?: GPUCullMode;
     depthWriteEnabled?: boolean;
     compareFunction?: GPUCompareFunction;
+    instanced?: boolean;
   }): GPURenderPipeline {
     const shaderModule = this.getShaderModule();
     const layout = this.createPipelineLayout();
 
+    // Build vertex buffer layouts
+    const vertexBuffers: GPUVertexBufferLayout[] = [];
+    
+    // Base vertex buffer (always present)
+    vertexBuffers.push({
+      arrayStride: LOWPOLY_VERTEX_STRIDE,
+      stepMode: 'vertex',
+      attributes: LOWPOLY_VERTEX_LAYOUT.map((attr) => ({
+        format: attr.format,
+        offset: attr.offset,
+        shaderLocation: attr.shaderLocation,
+      })),
+    });
+
+    // Instance buffer (only for instanced pipelines)
+    if (config.instanced) {
+      vertexBuffers.push({
+        arrayStride: INSTANCE_STRIDE,
+        stepMode: 'instance',
+        attributes: INSTANCE_VERTEX_LAYOUT.map((attr) => ({
+          format: attr.format as GPUVertexFormat,
+          offset: attr.offset,
+          shaderLocation: attr.shaderLocation,
+        })),
+      });
+    }
+
     return this._device.createRenderPipeline({
-      label: 'LowPolyPipeline',
+      label: config.instanced ? 'LowPolyPipeline_Instanced' : 'LowPolyPipeline',
       layout,
       vertex: {
         module: shaderModule,
-        entryPoint: 'vertexMain',
-        buffers: [
-          {
-            arrayStride: LOWPOLY_VERTEX_STRIDE,
-            stepMode: 'vertex',
-            attributes: LOWPOLY_VERTEX_LAYOUT.map((attr) => ({
-              format: attr.format,
-              offset: attr.offset,
-              shaderLocation: attr.shaderLocation,
-            })),
-          },
-        ],
+        entryPoint: config.instanced ? 'vertexMainInstanced' : 'vertexMain',
+        buffers: vertexBuffers,
       },
       fragment: {
         module: shaderModule,
