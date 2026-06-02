@@ -78,6 +78,7 @@ export class RivalSpawner {
   private activeRivals: Map<string, SpawnedRival> = new Map();
   private config: RivalSpawnerConfig;
   private zoneManager: ZoneManager;
+  private clubManager: ClubManager;
   
   // Spawn tables by zone
   private spawnTables: Map<string, RivalSpawnTable[]> = new Map();
@@ -94,13 +95,36 @@ export class RivalSpawner {
   // Time tracking
   private currentTimeOfDay: number = 12;
   
+  // Player state for requirement checking
+  private playerState: Partial<PlayerState> = {
+    totalMileage: 0,
+    winStreak: 0,
+    totalWins: 0,
+    currentCarModel: 'unknown',
+    currentCarColor: 'white',
+    clubsBeaten: [],
+    membersBeatenPerClub: {},
+    wanderersFound: 0,
+    defeatedRivals: [],
+    clubReputation: {},
+    currentTimeOfDay: 12,
+    isAlone: true,
+    currentSpeed: 0,
+    weatherCondition: 'clear',
+  };
+  
   // Callbacks
   private onRivalSpawned?: (rival: SpawnedRival) => void;
   private onChallengeInitiated?: (rival: SpawnedRival) => void;
   private onRivalDefeated?: (rival: SpawnedRival) => void;
 
-  constructor(zoneManager: ZoneManager, config: Partial<RivalSpawnerConfig> = {}) {
+  constructor(
+    zoneManager: ZoneManager, 
+    clubManagerInstance: ClubManager = defaultClubManager,
+    config: Partial<RivalSpawnerConfig> = {}
+  ) {
     this.zoneManager = zoneManager;
+    this.clubManager = clubManagerInstance;
     this.config = { ...DEFAULT_CONFIG, ...config };
     
     this.initializeSpawnTables();
@@ -289,7 +313,7 @@ export class RivalSpawner {
   }
 
   /**
-   * Update rival spawner
+   * Update rival spawner with Club System integration
    */
   update(deltaTime: number, playerPosition: THREE.Vector3, playerSpeed: number): void {
     // Update cooldowns
@@ -304,13 +328,23 @@ export class RivalSpawner {
     this.currentTimeOfDay = this.zoneManager ? 
       (this.zoneManager as any).currentTimeOfDay || 12 : 12;
     
+    // Sync player state with current data
+    this.playerState.currentTimeOfDay = this.currentTimeOfDay;
+    this.playerState.currentSpeed = playerSpeed;
+    
     // Get current zone properties
     const zoneProps = this.zoneManager.getZoneProperties(playerPosition);
     const currentZone = this.zoneManager.getCurrentZone(playerPosition);
     
-    // Try to spawn new rivals
+    // Try to spawn new rivals (club-based or wanderer)
     if (zoneProps && this.spawnCooldown <= 0) {
-      this.trySpawnRival(playerPosition, zoneProps, currentZone);
+      // First try to spawn a wanderer (rare encounter)
+      if (zoneProps.canSpawnWanderer && Math.random() < zoneProps.wandererTriggerChance) {
+        this.trySpawnWanderer(playerPosition, zoneProps, currentZone);
+      } else {
+        // Otherwise try normal club-based rival spawn
+        this.trySpawnRival(playerPosition, zoneProps, currentZone);
+      }
     }
     
     // Update active rivals
@@ -323,7 +357,59 @@ export class RivalSpawner {
   }
 
   /**
-   * Try to spawn a new rival
+   * Try to spawn a wanderer based on Club Manager conditions
+   */
+  private trySpawnWanderer(
+    playerPosition: THREE.Vector3,
+    zoneProps?: ReturnType<typeof ZoneManager.prototype.getZoneProperties>,
+    zone?: ZoneDefinition | null
+  ): boolean {
+    if (!zone || !zone.clubOwner) return false;
+    
+    // Use Club Manager to check wanderer conditions
+    const wanderer = this.clubManager.checkWandererSpawn(zone.id, this.playerState as PlayerState);
+    
+    if (!wanderer) return false;
+    
+    // Find spawn position
+    const spawnPos = this.findSpawnPosition(playerPosition);
+    if (!spawnPos) return false;
+    
+    // Convert club rival definition to spawnable rival
+    const rivalDef = this.convertClubRivalToSpawnable(wanderer);
+    
+    // Create spawned rival
+    const rival: SpawnedRival = {
+      definition: rivalDef,
+      position: spawnPos,
+      lane: Math.round(spawnPos.x / TRAFFIC_CONFIG.LANE_WIDTH),
+      speed: this.calculateRivalSpeed(rivalDef),
+      state: 'CRUISING',
+      challengeInitiated: false,
+    };
+    
+    // Allocate instance
+    const instanceIndex = this.allocateInstance(rival);
+    if (instanceIndex !== null) {
+      rival.instanceIndex = instanceIndex;
+    }
+    
+    // Add to active rivals
+    this.activeRivals.set(rival.definition.id + '_' + Date.now(), rival);
+    
+    // Set longer spawn cooldown for wanderers (they're rare!)
+    this.spawnCooldown = 30;
+    
+    // Callback
+    if (this.onRivalSpawned) {
+      this.onRivalSpawned(rival);
+    }
+    
+    return true;
+  }
+
+  /**
+   * Try to spawn a new rival using Club Manager data
    */
   trySpawnRival(
     playerPosition: THREE.Vector3,
@@ -342,13 +428,30 @@ export class RivalSpawner {
       return false;
     }
     
-    // Get spawn table for zone type
-    const spawnTable = this.getSpawnTableForZone(zone.type);
-    if (!spawnTable || spawnTable.length === 0) return false;
+    // Get club owner from zone
+    const clubOwner = zone.clubOwner;
     
-    // Select rival based on weights and time
-    const selectedRival = this.selectRivalFromTable(spawnTable);
-    if (!selectedRival) return false;
+    // Try to get rivals from Club Manager first
+    let availableRivals: RivalDefinition[] = [];
+    
+    if (clubOwner) {
+      // Get rivals for this zone from Club Manager
+      const clubRivals = this.clubManager.getRivalsForZone(zone.id);
+      availableRivals = clubRivals.map(r => this.convertClubRivalToSpawnable(r));
+    }
+    
+    // Fallback to legacy spawn tables if no club rivals
+    if (availableRivals.length === 0) {
+      const spawnTable = this.getSpawnTableForZone(zone.type);
+      if (!spawnTable || spawnTable.length === 0) return false;
+      
+      const selectedRival = this.selectRivalFromTable(spawnTable);
+      if (!selectedRival) return false;
+      availableRivals = [selectedRival];
+    }
+    
+    // Select random rival from available pool
+    const selectedRival = availableRivals[Math.floor(Math.random() * availableRivals.length)];
     
     // Check reputation requirement
     if (selectedRival.minReputation !== undefined && this.zoneManager) {
@@ -399,6 +502,74 @@ export class RivalSpawner {
    */
   private getSpawnTableForZone(zoneType: string): RivalSpawnTable[] {
     return this.spawnTables.get(zoneType) || [];
+  }
+
+  /**
+   * Convert Club Manager rival definition to spawnable rival
+   */
+  private convertClubRivalToSpawnable(clubRival: ClubRivalDefinition): RivalDefinition {
+    // Map club rival role to rival type
+    let rivalType: RivalType;
+    switch (clubRival.role) {
+      case 'LEADER':
+        rivalType = RivalType.BOSS;
+        break;
+      case 'WANDERER':
+        rivalType = RivalType.WANDERER;
+        break;
+      case 'MID_BOSS':
+        rivalType = RivalType.TECHNICAL;
+        break;
+      default:
+        // Map stats to determine type
+        if (clubRival.stats.speed >= 80) {
+          rivalType = RivalType.SPRINT;
+        } else if (clubRival.stats.aggression >= 75) {
+          rivalType = RivalType.AGGRESSOR;
+        } else if (clubRival.stats.skill >= 80) {
+          rivalType = RivalType.TECHNICAL;
+        } else {
+          rivalType = RivalType.CRUISER;
+        }
+    }
+    
+    // Map difficulty from stats
+    const avgStats = (clubRival.stats.speed + clubRival.stats.aggression + clubRival.stats.skill) / 3;
+    let difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'EXTREME';
+    if (avgStats < 60) {
+      difficulty = 'EASY';
+    } else if (avgStats < 75) {
+      difficulty = 'MEDIUM';
+    } else if (avgStats < 90) {
+      difficulty = 'HARD';
+    } else {
+      difficulty = 'EXTREME';
+    }
+    
+    // Generate color from club colors or use default
+    let carColor = 0xff0000; // Default red
+    // Could extract from club data if needed
+    
+    return {
+      id: clubRival.id,
+      name: clubRival.name,
+      clubId: clubRival.clubId,
+      carModel: clubRival.carModel,
+      stats: clubRival.stats,
+      spawnZones: clubRival.spawnZones,
+      activeTimes: clubRival.activeTimes,
+      role: clubRival.role,
+      wandererConditions: clubRival.wandererConditions,
+      specialMoves: clubRival.specialMoves,
+      dialogue: clubRival.dialogue,
+      unlockRequirements: clubRival.unlockRequirements,
+      type: rivalType,
+      difficulty,
+      speedModifier: clubRival.stats.speed / 100,
+      aggressionModifier: clubRival.stats.aggression / 100,
+      skillModifier: clubRival.stats.skill / 100,
+      carColor,
+    };
   }
 
   /**
@@ -684,6 +855,58 @@ export class RivalSpawner {
 
   onRivalDefeated(callback: (rival: SpawnedRival) => void): void {
     this.onRivalDefeated = callback;
+  }
+
+  /**
+   * Update player state for requirement checking
+   */
+  updatePlayerState(state: Partial<PlayerState>): void {
+    this.playerState = { ...this.playerState, ...state };
+  }
+
+  /**
+   * Get current player state
+   */
+  getPlayerState(): Partial<PlayerState> {
+    return { ...this.playerState };
+  }
+
+  /**
+   * Record rival defeat and update Club Manager
+   */
+  recordRivalDefeat(rivalId: string): void {
+    // Update Club Manager
+    this.clubManager.recordRivalDefeated(rivalId);
+    
+    // Update local player state
+    if (this.playerState.defeatedRivals) {
+      this.playerState.defeatedRivals.push(rivalId);
+    } else {
+      this.playerState.defeatedRivals = [rivalId];
+    }
+    
+    // Update win streak
+    this.playerState.winStreak = (this.playerState.winStreak || 0) + 1;
+    this.playerState.totalWins = (this.playerState.totalWins || 0) + 1;
+  }
+
+  /**
+   * Check if player can challenge a club leader
+   */
+  canChallengeLeader(clubId: string): boolean {
+    return this.clubManager.canChallengeLeader(clubId, this.playerState as PlayerState);
+  }
+
+  /**
+   * Get progress towards challenging a club leader
+   */
+  getLeaderChallengeProgress(clubId: string): {
+    requirement: import('../types/ClubSystem').ClubRequirement;
+    current: number;
+    required: number;
+    percentage: number;
+  }[] {
+    return this.clubManager.getProgressTowardsLeader(clubId, this.playerState as PlayerState);
   }
 
   /**
