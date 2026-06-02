@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, Car, Trophy, Coins, ArrowLeft, Home, RotateCcw as Replay } from 'lucide-react';
 import Game from './Game';
 import { INITIAL_CARS, CarStats } from './constants';
-
+import startMenuBg from "../art/fullsendstartmenu.png";
 type Screen = 'MENU' | 'GARAGE' | 'PLAYING' | 'GAMEOVER' | 'LOADING';
 
 interface GameState {
@@ -119,25 +119,42 @@ interface MenuProps {
 }
 
 const Menu: React.FC<MenuProps> = ({ coins, highScore, onStart, onGarage }) => (
-  <div className="flex flex-col items-center justify-center h-full bg-slate-900 text-white space-y-8 p-4">
-    <h1 className="text-6xl font-black italic tracking-tighter text-yellow-400 drop-shadow-xl">
-      FULL SEND HIGHWAY BATTLE
-    </h1>
-    
-    <div className="grid grid-cols-1 gap-4 w-64">
-      <button 
-        onClick={onStart}
-        className="flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-4 rounded-xl text-xl transition-all hover:scale-105 active:scale-95 shadow-lg"
-      >
-        <Play fill="black" /> START GAME
-      </button>
-      <button 
-        onClick={onGarage}
-        className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 font-bold py-4 rounded-xl text-xl transition-all"
-      >
-        <Car /> GARAGE
-      </button>
-    </div>
+ <div
+  className="start-menu"
+  style={{
+    backgroundImage: `url(${startMenuBg})`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    width: "100vw",
+    height: "100vh",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    textAlign: "center",
+    color: "white",
+  }}
+>
+  <h1 className="text-6xl font-black italic tracking-tighter text-yellow-400 drop-shadow-xl mb-8">
+    FULL SEND HIGHWAY BATTLE
+  </h1>
+
+  <button
+    onClick={onStart}
+    className="px-8 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-2xl rounded-xl shadow-xl mb-4"
+  >
+    START RACE
+  </button>
+
+  <button
+    onClick={onGarage}
+    className="px-8 py-4 bg-white/80 hover:bg-white text-black font-bold text-2xl rounded-xl shadow-xl"
+  >
+    GARAGE
+  </button>
+</div>
+
 
     <div className="flex gap-8 text-xl">
       <div className="flex items-center gap-2 text-yellow-400">
