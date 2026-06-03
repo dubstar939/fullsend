@@ -19,6 +19,7 @@
     "three": "^0.183.2"
   },
   "devDependencies": {
+    "@rollup/plugin-image": "^3.0.3",
     "@tailwindcss/vite": "4.1.17",
     "@types/node": "22.19.17",
     "@types/react": "19.2.7",
@@ -28,6 +29,7 @@
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vite": "7.2.4",
+    "vite-plugin-image-optimizer": "^2.0.3",
     "vite-plugin-singlefile": "2.3.0"
   }
 }
