@@ -119,42 +119,39 @@ interface MenuProps {
 }
 
 const Menu: React.FC<MenuProps> = ({ coins, highScore, onStart, onGarage }) => (
- <div
-
-  style={{
-    backgroundImage: `url(${startMenuBg})`,
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-    width: "100vw",
-    height: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    textAlign: "center",
-    color: "white",
-  }}
->
-  <h1 className="text-6xl font-black italic tracking-tighter text-yellow-400 drop-shadow-xl mb-8">
-    FULL SEND HIGHWAY BATTLE
-  </h1>
-
-  <button
-    onClick={onStart}
-    className="px-8 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-2xl rounded-xl shadow-xl mb-4"
+  <div
+    style={{
+      backgroundImage: `url(${startMenuBg})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+      width: "100vw",
+      height: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      textAlign: "center",
+      color: "white",
+    }}
   >
-    START RACE
-  </button>
+    <h1 className="text-6xl font-black italic tracking-tighter text-yellow-400 drop-shadow-xl mb-8">
+      FULL SEND HIGHWAY BATTLE
+    </h1>
 
-  <button
-    onClick={onGarage}
-    className="px-8 py-4 bg-white/80 hover:bg-white text-black font-bold text-2xl rounded-xl shadow-xl"
-  >
-    GARAGE
-  </button>
-</div>
+    <button
+      onClick={onStart}
+      className="px-8 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-2xl rounded-xl shadow-xl mb-4"
+    >
+      START RACE
+    </button>
 
+    <button
+      onClick={onGarage}
+      className="px-8 py-4 bg-white/80 hover:bg-white text-black font-bold text-2xl rounded-xl shadow-xl mb-8"
+    >
+      GARAGE
+    </button>
 
     <div className="flex gap-8 text-xl">
       <div className="flex items-center gap-2 text-yellow-400">

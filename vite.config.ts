@@ -27,8 +27,10 @@ export default defineConfig({
         },
       },
     },
+    assetsInlineLimit: 0,
   },
   optimizeDeps: {
     include: ["three"],
   },
+  assetsInclude: ["**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.svg"],
 });
