@@ -4,19 +4,7 @@
  */
 
 import * as THREE from 'three';
-
-// Inline TRAFFIC_CONFIG for models to avoid circular dependency
-const TRAFFIC_CONFIG = {
-  LANE_COUNT: 4,
-  LANE_WIDTH: 4.2,
-  VEHICLE_CLASSES: {
-    SEDAN: { weight: 0.45, speedVar: [0.3, 0.5] as [number, number], size: [1.4, 0.8, 4.2] as [number, number, number] },
-    SUV: { weight: 0.25, speedVar: [0.25, 0.4] as [number, number], size: [1.6, 1.0, 4.8] as [number, number, number] },
-    SPORT: { weight: 0.15, speedVar: [0.5, 0.7] as [number, number], size: [1.5, 0.7, 4.0] as [number, number, number] },
-    TRUCK: { weight: 0.10, speedVar: [0.2, 0.35] as [number, number], size: [2.0, 1.8, 6.5] as [number, number, number] },
-    POLICE: { weight: 0.05, speedVar: [0.6, 0.8] as [number, number], size: [1.5, 0.9, 4.5] as [number, number, number] },
-  },
-};
+import { TRAFFIC_CONFIG } from './config/gameConfig';
 
 export interface VehicleColors {
   body: number;
