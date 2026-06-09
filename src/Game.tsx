@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { createCarMesh, createRoadSegment, createTrafficVehicle, createPoliceCar } from './models';
 import { PHYSICS_CONFIG, TRAFFIC_CONFIG } from './config/gameConfig';
+import { HighwayFreeRoamSystem, createFreeRoamSystem } from './systems/HighwayFreeRoamSystem';
+import { PlayerCar } from './entities/PlayerCar';
+import { InputHandler, InputAxis } from './engine/core/InputHandler';
 
 
 interface GameProps {
