@@ -32,5 +32,10 @@ export default defineConfig({
   optimizeDeps: {
     include: ["three"],
   },
-  assetsInclude: ["**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.svg"],
+  assetsInclude: ["**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.svg", "**/*.wgsl"],
+  css: {
+    modules: {
+      localsConvention: 'camelCase'
+    }
+  }
 });
