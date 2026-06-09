@@ -502,11 +502,20 @@ class FrameUniformsData {
   setProjectionMatrix(matrix: any): void {
     this.data.set(matrix, FrameUniformsData.PROJ_MATRIX_OFFSET);
     
-    // Also compute view-projection
+    // Compute view-projection matrix (projection * view)
+    const viewMatrix = new Float32Array(this.data.buffer, FrameUniformsData.VIEW_MATRIX_OFFSET * 4, 16);
+    const projMatrix = new Float32Array(this.data.buffer, FrameUniformsData.PROJ_MATRIX_OFFSET * 4, 16);
     const viewProj = new Float32Array(16);
-    // Simple multiplication (in production, use gl-matrix)
-    for (let i = 0; i < 16; i++) {
-      viewProj[i] = this.data[FrameUniformsData.PROJ_MATRIX_OFFSET + i];
+    
+    // Matrix multiplication: viewProj = projection * view
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 4; col++) {
+        let sum = 0;
+        for (let k = 0; k < 4; k++) {
+          sum += projMatrix[row * 4 + k] * viewMatrix[k * 4 + col];
+        }
+        viewProj[row * 4 + col] = sum;
+      }
     }
     this.data.set(viewProj, FrameUniformsData.VIEW_PROJ_OFFSET);
   }
@@ -564,10 +573,14 @@ class FrameUniformsData {
       // Intensity
       this.data[offset + 8] = light.intensity;
       
-      // Padding
+      // Padding (4 floats to complete 16-float structure)
       this.data[offset + 9] = 0;
       this.data[offset + 10] = 0;
       this.data[offset + 11] = 0;
+      this.data[offset + 12] = 0;
+      this.data[offset + 13] = 0;
+      this.data[offset + 14] = 0;
+      this.data[offset + 15] = 0;
       
       count++;
     }
