@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { PHYSICS_CONFIG } from '../config/gameConfig';
-import { InputAxis } from '../core/InputHandler';
+import { InputAxis } from '../engine/systems/InputSystem';
 
 export interface PlayerCarState {
   position: THREE.Vector3;
