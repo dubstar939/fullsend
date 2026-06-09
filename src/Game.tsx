@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { createCarMesh, createRoadSegment, createTrafficVehicle, createPoliceCar } from './models';
-import { PHYSICS_CONFIG, TRAFFIC_CONFIG } from './config/gameConfig';
+import { PHYSICS_CONFIG, TRAFFIC_CONFIG, INITIAL_CARS } from './config/gameConfig';
 import { HighwayFreeRoamSystem, createFreeRoamSystem } from './systems/HighwayFreeRoamSystem';
 import { PlayerCar } from './entities/PlayerCar';
-import { InputHandler, InputAxis } from './engine/core/InputHandler';
+import { InputSystem, InputAxis } from './engine/systems/InputSystem';
 
 
 interface GameProps {
@@ -63,7 +63,9 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const playerCarRef = useRef<THREE.Group | null>(null);
+  const playerCarRef = useRef<PlayerCar | null>(null);
+  const inputSystemRef = useRef<InputSystem | null>(null);
+  const freeRoamSystemRef = useRef<HighwayFreeRoamSystem | null>(null);
   const animationFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
 
@@ -76,9 +78,10 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
       rendererRef.current.dispose();
     }
 
+    // Create scene with night-time atmosphere for Tokyo Xtreme Racer style
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
+    scene.background = new THREE.Color(0x0a0a1a);
+    scene.fog = new THREE.FogExp2(0x0a0a1a, 0.015);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -87,116 +90,68 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
     containerRef.current.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Lighting - Night time with street lights feel
+    const ambientLight = new THREE.AmbientLight(0x404060, 0.4);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 10);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
+    const moonLight = new THREE.DirectionalLight(0x6688cc, 0.3);
+    moonLight.position.set(-20, 30, -20);
+    moonLight.castShadow = true;
+    scene.add(moonLight);
 
-    // Player
-    const playerCar = createCarMesh(carColor);
-    scene.add(playerCar);
+    // Initialize Input System
+    const inputSystem = new InputSystem();
+    inputSystemRef.current = inputSystem;
+
+    // Create player car with stats from selected car
+    const playerCarMesh = createCarMesh(carColor);
+    scene.add(playerCarMesh);
+    
+    // Get car stats based on color (simplified - in production would pass car index)
+    const selectedCarIndex = INITIAL_CARS.findIndex(car => car.color.toLowerCase() === carColor.toLowerCase());
+    const carStats = selectedCarIndex >= 0 ? INITIAL_CARS[selectedCarIndex] : INITIAL_CARS[0];
+    
+    const playerCar = new PlayerCar(playerCarMesh, {
+      speed: carStats.speed,
+      handling: carStats.handling,
+      acceleration: carStats.acceleration * 1000, // Scale to match physics config
+      grip: carStats.grip,
+    });
     playerCarRef.current = playerCar;
 
-    // Road Initialization
-    for (let i = 0; i < 5; i++) {
-      const road = createRoadSegment();
-      road.position.z = -i * 100;
-      scene.add(road);
-      gameStateRef.current.roadSegments.push(road);
-    }
-
-    // Input Handlers
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case 'ArrowLeft':
-        case 'a':
-          gameStateRef.current.input.left = true;
-          break;
-        case 'ArrowRight':
-        case 'd':
-          gameStateRef.current.input.right = true;
-          break;
-        case 'ArrowUp':
-        case 'w':
-          gameStateRef.current.input.up = true;
-          break;
-        case 'ArrowDown':
-        case 's':
-          gameStateRef.current.input.down = true;
-          break;
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case 'ArrowLeft':
-        case 'a':
-          gameStateRef.current.input.left = false;
-          break;
-        case 'ArrowRight':
-        case 'd':
-          gameStateRef.current.input.right = false;
-          break;
-        case 'ArrowUp':
-        case 'w':
-          gameStateRef.current.input.up = false;
-          break;
-        case 'ArrowDown':
-        case 's':
-          gameStateRef.current.input.down = false;
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    // Initialize Highway Free Roam System
+    const freeRoamSystem = createFreeRoamSystem(scene, {
+      enableTraffic: true,
+      enableRivals: false, // Start without rivals for simpler gameplay
+      enableFlashChallenge: true,
+      enableZones: true,
+      maxTrafficVehicles: 40,
+      maxActiveRivals: 0,
+      timeOfDay: 20, // Night time
+      weather: 'clear',
+    });
+    freeRoamSystemRef.current = freeRoamSystem;
 
     // Game Loop
     let lastTime = performance.now();
     
-    const spawnTraffic = () => {
-      const lane = Math.floor(Math.random() * 4) - 1.5;
-      const vehicleClasses = Object.keys(TRAFFIC_CONFIG.VEHICLE_CLASSES) as (keyof typeof TRAFFIC_CONFIG.VEHICLE_CLASSES)[];
-      const randomClass = vehicleClasses[Math.floor(Math.random() * vehicleClasses.length)];
-      
-      let trafficCar: THREE.Group;
-      if (randomClass === 'POLICE') {
-        trafficCar = createPoliceCar();
-      } else {
-        trafficCar = createTrafficVehicle(randomClass);
-      }
-      
-      trafficCar.position.set(lane * 4, 0, gameStateRef.current.playerZ - 100);
-      scene.add(trafficCar);
-      gameStateRef.current.traffic.push({
-        mesh: trafficCar,
-        speed: 0.2 + Math.random() * 0.3,
-        lane: lane
-      });
-    };
-
     const updatePlayerMovement = (dt: number) => {
       const state = gameStateRef.current;
+      const input = inputSystem.getAxis();
       
-      if (state.input.up) {
-        state.playerSpeed = Math.min(state.playerSpeed + PHYSICS_CONFIG.ACCELERATION_BASE, PHYSICS_CONFIG.MAX_SPEED);
-      } else if (state.input.down) {
-        state.playerSpeed = Math.max(state.playerSpeed - PHYSICS_CONFIG.BRAKE_FORCE, 0);
-      } else {
-        state.playerSpeed = Math.max(state.playerSpeed - PHYSICS_CONFIG.DECELERATION_FRICTION, 0);
-      }
-
-      if (state.input.left) state.playerX = Math.max(state.playerX - 0.15, -6);
-      if (state.input.right) state.playerX = Math.min(state.playerX + 0.15, 6);
-
-      state.playerZ -= state.playerSpeed * 60 * dt;
-      playerCar.position.set(state.playerX, 0, state.playerZ);
+      // Update player car physics
+      playerCar.update(input, dt);
+      
+      // Sync game state
+      const pos = playerCar.getPosition();
+      state.playerX = pos.x;
+      state.playerY = pos.y;
+      state.playerZ = pos.z;
+      state.playerSpeed = playerCar.getSpeed();
     };
 
     const updateUI = (now: number, dt: number) => {
@@ -208,57 +163,43 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
 
     const updateCamera = () => {
       const state = gameStateRef.current;
-      camera.position.set(state.playerX, 5, state.playerZ + 12);
-      camera.lookAt(state.playerX, 2, state.playerZ - 10);
-    };
-
-    const updateRoadSegments = () => {
-      gameStateRef.current.roadSegments.forEach(road => {
-        if (road.position.z > gameStateRef.current.playerZ + 100) {
-          road.position.z -= 500;
-        }
-      });
-    };
-
-    const checkCollision = (car: TrafficCar): boolean => {
-      const dist = playerCar.position.distanceTo(car.mesh.position);
-      return dist < 2.5;
-    };
-
-    const updateTraffic = (dt: number) => {
-      const state = gameStateRef.current;
-      
-      if (Math.random() < 0.02) spawnTraffic();
-
-      // Iterate backwards to safely splice while iterating
-      for (let i = state.traffic.length - 1; i >= 0; i--) {
-        const car = state.traffic[i];
-        car.mesh.position.z -= car.speed * 60 * dt;
-
-        if (checkCollision(car)) {
-          state.isGameOver = true;
-          onGameOver(Math.floor(-state.playerZ / 10), state.coins);
-          return; // Exit early after collision
-        }
-
-        if (car.mesh.position.z > state.playerZ + 50) {
-          scene.remove(car.mesh);
-          state.traffic.splice(i, 1);
-          state.score += 10;
-        }
-      }
+      camera.position.set(state.playerX * 0.3 + state.playerX, 6, state.playerZ + 15);
+      camera.lookAt(state.playerX, 1, state.playerZ - 15);
     };
 
     const animate = (now: number) => {
       if (gameStateRef.current.isGameOver) return;
-      const dt = Math.min((now - lastTimeRef.current) / 1000, 0.1); // Cap delta time to prevent physics explosions on lag spikes
+      const dt = Math.min((now - lastTimeRef.current) / 1000, 0.1);
       lastTimeRef.current = now;
 
+      // Update input system
+      inputSystem.update(dt);
+
+      // Update player
       updatePlayerMovement(dt);
+
+      // Update free roam system (highway, traffic, zones)
+      if (freeRoamSystemRef.current && playerCarRef.current) {
+        const playerPos = playerCar.getPosition();
+        const playerSpeed = playerCar.getSpeed();
+        
+        freeRoamSystemRef.current.update(dt, playerPos, playerSpeed);
+        
+        // Check for collisions with traffic
+        const collision = freeRoamSystemRef.current.checkPlayerCollision({
+          min: new THREE.Vector3(playerPos.x - 1, 0, playerPos.z - 2),
+          max: new THREE.Vector3(playerPos.x + 1, 1.5, playerPos.z + 2),
+        });
+        
+        if (collision) {
+          gameStateRef.current.isGameOver = true;
+          onGameOver(Math.floor(-playerPos.z / 10), 0);
+          return;
+        }
+      }
+
       updateUI(now, dt);
       updateCamera();
-      updateRoadSegments();
-      updateTraffic(dt);
 
       if (rendererRef.current && cameraRef.current && sceneRef.current) {
         rendererRef.current.render(sceneRef.current, cameraRef.current);
@@ -279,10 +220,16 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
     window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameRef.current);
+      
+      // Cleanup systems
+      if (inputSystemRef.current) {
+        inputSystemRef.current.dispose();
+      }
+      if (freeRoamSystemRef.current) {
+        freeRoamSystemRef.current.dispose();
+      }
       
       // Cleanup Three.js resources
       if (rendererRef.current) {
@@ -309,7 +256,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
         });
       }
     };
-  }, [carColor]);
+  }, [carColor, onGameOver]);
 
   return (
     <div ref={containerRef} className="w-full h-full">

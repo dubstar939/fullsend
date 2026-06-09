@@ -1,1 +1,7 @@
-Nothing should be ignored based on the provided file changes. The modification of 'src/Game.tsx' represents a source code file change, which does not necessitate adding any entries to the .gitignore file. Therefore, the .gitignore content remains empty.
+```
+# Build artifacts
+dist/
+build/
+*.js
+*.css
+```
