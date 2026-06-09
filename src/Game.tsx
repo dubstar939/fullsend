@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { createCarMesh, createRoadSegment, createTrafficVehicle, createPoliceCar } from './models';
-import { PHYSICS_CONFIG, TRAFFIC_CONFIG } from './constants';
+import { PHYSICS_CONFIG, TRAFFIC_CONFIG } from './config/gameConfig';
 
 
 interface GameProps {
@@ -57,18 +57,34 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const gameStateRef = useRef<GameState>(createInitialGameState());
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const playerCarRef = useRef<THREE.Group | null>(null);
+  const animationFrameRef = useRef<number>(0);
+  const lastTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Cleanup previous instance if it exists
+    if (rendererRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
+      containerRef.current.removeChild(rendererRef.current.domElement);
+      rendererRef.current.dispose();
+    }
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
     scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
+    sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    cameraRef.current = camera;
+
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
+    rendererRef.current = renderer;
     containerRef.current.appendChild(renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -82,6 +98,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
     // Player
     const playerCar = createCarMesh(carColor);
     scene.add(playerCar);
+    playerCarRef.current = playerCar;
 
     // Road Initialization
     for (let i = 0; i < 5; i++) {
@@ -231,8 +248,8 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
 
     const animate = (now: number) => {
       if (gameStateRef.current.isGameOver) return;
-      const dt = Math.min((now - lastTime) / 1000, 0.1); // Cap delta time to prevent physics explosions on lag spikes
-      lastTime = now;
+      const dt = Math.min((now - lastTimeRef.current) / 1000, 0.1); // Cap delta time to prevent physics explosions on lag spikes
+      lastTimeRef.current = now;
 
       updatePlayerMovement(dt);
       updateUI(now, dt);
@@ -240,16 +257,21 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
       updateRoadSegments();
       updateTraffic(dt);
 
-      renderer.render(scene, camera);
-      requestId = requestAnimationFrame(animate);
+      if (rendererRef.current && cameraRef.current && sceneRef.current) {
+        rendererRef.current.render(sceneRef.current, cameraRef.current);
+      }
+      animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    let requestId: number = requestAnimationFrame(animate);
+    lastTimeRef.current = performance.now();
+    animationFrameRef.current = requestAnimationFrame(animate);
 
     const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      if (cameraRef.current && rendererRef.current) {
+        cameraRef.current.aspect = window.innerWidth / window.innerHeight;
+        cameraRef.current.updateProjectionMatrix();
+        rendererRef.current.setSize(window.innerWidth, window.innerHeight);
+      }
     };
     window.addEventListener('resize', handleResize);
 
@@ -257,9 +279,32 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(requestId);
-      renderer.dispose();
-      if (containerRef.current) containerRef.current.removeChild(renderer.domElement);
+      cancelAnimationFrame(animationFrameRef.current);
+      
+      // Cleanup Three.js resources
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        if (containerRef.current && rendererRef.current.domElement.parentNode === containerRef.current) {
+          containerRef.current.removeChild(rendererRef.current.domElement);
+        }
+      }
+      
+      // Cleanup scene resources
+      if (sceneRef.current) {
+        sceneRef.current.traverse((object) => {
+          if ((object as THREE.Mesh).isMesh) {
+            const mesh = object as THREE.Mesh;
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+              if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(m => m.dispose());
+              } else {
+                mesh.material.dispose();
+              }
+            }
+          }
+        });
+      }
     };
   }, [carColor]);
 

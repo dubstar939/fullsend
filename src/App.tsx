@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Car, Trophy, Coins, ArrowLeft, Home, RotateCcw as Replay } from 'lucide-react';
 import Game from './Game';
-import { INITIAL_CARS, CarStats } from './constants';
+import { INITIAL_CARS, STORAGE_KEYS, CarStats } from './config/gameConfig';
 import startMenuBg from "./art/fullsendstartmenu.png";
 type Screen = 'MENU' | 'GARAGE' | 'PLAYING' | 'GAMEOVER' | 'LOADING';
 
@@ -12,12 +12,6 @@ interface GameState {
   selectedCarIndex: number;
   lastScore: number;
 }
-
-const STORAGE_KEYS = {
-  COINS: 'traffic_jam_coins',
-  HIGH_SCORE: 'traffic_jam_highscore',
-  CARS: 'traffic_jam_cars',
-} as const;
 
 const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
   const saved = localStorage.getItem(key);
