@@ -210,25 +210,28 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
       
       if (Math.random() < 0.02) spawnTraffic();
 
-      state.traffic.forEach((car, index) => {
+      // Iterate backwards to safely splice while iterating
+      for (let i = state.traffic.length - 1; i >= 0; i--) {
+        const car = state.traffic[i];
         car.mesh.position.z -= car.speed * 60 * dt;
 
         if (checkCollision(car)) {
           state.isGameOver = true;
           onGameOver(Math.floor(-state.playerZ / 10), state.coins);
+          return; // Exit early after collision
         }
 
         if (car.mesh.position.z > state.playerZ + 50) {
           scene.remove(car.mesh);
-          state.traffic.splice(index, 1);
+          state.traffic.splice(i, 1);
           state.score += 10;
         }
-      });
+      }
     };
 
     const animate = (now: number) => {
       if (gameStateRef.current.isGameOver) return;
-      const dt = (now - lastTime) / 1000;
+      const dt = Math.min((now - lastTime) / 1000, 0.1); // Cap delta time to prevent physics explosions on lag spikes
       lastTime = now;
 
       updatePlayerMovement(dt);
@@ -238,10 +241,10 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor }) => {
       updateTraffic(dt);
 
       renderer.render(scene, camera);
-      requestAnimationFrame(animate);
+      requestId = requestAnimationFrame(animate);
     };
 
-    const requestId = requestAnimationFrame(animate);
+    let requestId: number = requestAnimationFrame(animate);
 
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;

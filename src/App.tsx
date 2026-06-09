@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, Car, Trophy, Coins, ArrowLeft, Home, RotateCcw as Replay } from 'lucide-react';
 import Game from './Game';
 import { INITIAL_CARS, CarStats } from './constants';
-import startMenuBg from "../art/fullsendstartmenu.png";
+import startMenuBg from "./art/fullsendstartmenu.png";
 type Screen = 'MENU' | 'GARAGE' | 'PLAYING' | 'GAMEOVER' | 'LOADING';
 
 interface GameState {
@@ -41,12 +41,22 @@ const App: React.FC = () => {
   }, [gameState.coins, gameState.highScore, gameState.cars]);
 
   const handleGameOver = (score: number, earnedCoins: number) => {
-    setGameState(prev => ({
-      ...prev,
-      lastScore: score,
-      coins: prev.coins + earnedCoins + Math.floor(score / 10),
-      highScore: Math.max(prev.highScore, score),
-    }));
+    setGameState(prev => {
+      const newCoins = prev.coins + earnedCoins + Math.floor(score / 10);
+      const newHighScore = Math.max(prev.highScore, score);
+      
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (newCoins === prev.coins && newHighScore === prev.highScore) {
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        lastScore: score,
+        coins: newCoins,
+        highScore: newHighScore,
+      };
+    });
     setScreen('GAMEOVER');
   };
 
@@ -95,6 +105,7 @@ const App: React.FC = () => {
       {screen === 'PLAYING' && (
         <div className="relative w-full h-full">
           <Game 
+            key={`game-${gameState.selectedCarIndex}`} // Force remount on car change to apply new color
             onGameOver={handleGameOver} 
             carColor={gameState.cars[gameState.selectedCarIndex].color}
           />
