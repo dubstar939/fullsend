@@ -2,9 +2,6 @@
 # Build artifacts
 dist/
 build/
-*.css
-*.js
-*.map
 
 # Dependencies
 node_modules/
@@ -14,9 +11,12 @@ node_modules/
 .env.local
 *.env.*
 
-# Editors
+# Editor/IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*.tmp
 
 # Logs
 *.log
@@ -26,37 +26,41 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Compiled
+# Compiled and binary files
+*.class
 *.o
 *.obj
+*.exe
+*.dll
 *.so
 *.a
-*.dll
-*.exe
-
-# Compressed
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-
-# System
-.DS_Store
-Thumbs.db
+*.out
 
 # Coverage
 coverage/
 htmlcov/
 .coverage
 
-# Cache
+# MyPy
 .mypy_cache/
+
+# Pytest
 .pytest_cache/
+
+# Gradle
 .gradle/
 target/
+
+# Julia
+julia-*/
+
+# Zig
+zig*/
 ```
