@@ -40,7 +40,9 @@ struct DirectionalLightData {
   direction: vec4<f32>,    // xyz = direction, w = unused
   color: vec4<f32>,
   intensity: f32,
-  _padding: vec3<f32>
+  _padding1: f32,          // Additional padding for 64-byte alignment
+  _padding2: vec2<f32>,    // Final padding
+  _padding3: f32           // Complete 16-float structure
 };
 
 /**

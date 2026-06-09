@@ -12,6 +12,14 @@ export { Renderer } from './rendering/Renderer';
 export { LowPolyMaterial } from './rendering/LowPolyMaterial';
 export { InstancedMeshManager } from './rendering/InstancedMeshManager';
 
+// WebGPU Adapter (Optional Backend)
+export { 
+  WebGpuGameRenderer, 
+  createWebGPUCar, 
+  createWebGPURoadSegment, 
+  parseHexColor 
+} from './rendering/WebGpuGameAdapter';
+
 // Scene Graph
 export { SceneGraph } from './core/SceneGraph';
 export type { SceneNode, SceneNodeType } from './core/SceneGraph';

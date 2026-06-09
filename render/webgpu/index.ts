@@ -33,3 +33,7 @@ export type { RenderableConfig } from './WebGPURenderable';
 // Shaders
 export { ShaderModules, getShaderModule, createShaderModule, createShaderModuleFromName, LowPolyEntryPoints } from './shaders/shaderModules';
 export type { ShaderModule } from './shaders/shaderModules';
+
+// Common (re-exported for convenience)
+export { Camera } from '../common/Camera';
+export { Transform } from '../common/Transform';

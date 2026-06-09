@@ -2,19 +2,24 @@
 # Build artifacts
 dist/
 build/
+*.css
 *.js
+*.map
 
 # Dependencies
 node_modules/
+
+# Environment
+.env
+.env.local
+*.env.*
 
 # Editors
 .vscode/
 .idea/
 
-# Environment
-.env
-.env.local
-.env.*
+# Logs
+*.log
 
 # Python
 __pycache__/
@@ -22,10 +27,36 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Logs
-*.log
+# Compiled
+*.o
+*.obj
+*.so
+*.a
+*.dll
+*.exe
 
-# OS
+# Compressed
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+
+# System
 .DS_Store
 Thumbs.db
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Cache
+.mypy_cache/
+.pytest_cache/
+.gradle/
+target/
 ```
