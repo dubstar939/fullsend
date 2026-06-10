@@ -196,23 +196,32 @@ export class Engine {
   /**
    * Start the engine game loop
    */
-  start(onFrame?: (deltaTime: number) => void): void {
-    if (this.isRunning) return;
-    
-    this.isRunning = true;
-    this.lastFrameTime = performance.now();
-    this.onFrameCallback = onFrame;
-    
-    this.gameLoop();
+ start(onFrame?: (deltaTime: number) => void): void {
+  if (this.isRunning) return;
+
+  this.isRunning = true;
+  this.lastFrameTime = performance.now();
+  this.onFrameCallback = onFrame;
+  this.accumulator = 0;
+
+  this.gameLoop();
+}
+
   }
   
   /**
    * Stop the engine game loop
    */
-  stop(): void {
-    this.isRunning = false;
-    this.onFrameCallback = undefined;
+stop(): void {
+  this.isRunning = false;
+  this.onFrameCallback = undefined;
+
+  if (this.animationId !== null) {
+    cancelAnimationFrame(this.animationId);
+    this.animationId = null;
   }
+}
+
   
   /**
    * Main game loop with fixed timestep
@@ -338,24 +347,55 @@ export class Engine {
   /**
    * Cleanup and dispose resources
    */
-this.scene.traverse((obj: any) => {
-  if (obj.geometry) {
-    obj.geometry.dispose();
+/**
+ * Cleanup and dispose resources
+ */
+destroy(): void {
+  // Stop loop safely
+  this.isRunning = false;
+  this.onFrameCallback = undefined;
+
+  // Cancel RAF
+  if (this.animationId !== null) {
+    cancelAnimationFrame(this.animationId);
+    this.animationId = null;
   }
 
-  if (obj.material) {
-    if (Array.isArray(obj.material)) {
-      obj.material.forEach((m) => m.dispose());
-    } else {
-      obj.material.dispose();
+  // ✅ Dispose all geometries + materials (CRITICAL)
+  this.scene.traverse((obj: any) => {
+    if (obj.geometry) {
+      obj.geometry.dispose();
     }
-  }
-});
 
-// THEN clear scene
-while (this.scene.children.length > 0) {
-  this.scene.remove(this.scene.children[0]);
+    if (obj.material) {
+      if (Array.isArray(obj.material)) {
+        obj.material.forEach((m: any) => m.dispose());
+      } else {
+        obj.material.dispose();
+      }
+    }
+  });
+
+  // ✅ Remove all objects from scene
+  while (this.scene.children.length > 0) {
+    this.scene.remove(this.scene.children[0]);
+  }
+
+  // ✅ Dispose renderer (must already include forceContextLoss)
+  this.renderer.dispose();
+
+  // ✅ Dispose subsystems
+  this.assetLoader.dispose();
+  this.sceneGraph.dispose();
+  this.inputSystem.dispose();
+
+  // ✅ Reset timing
+  this.accumulator = 0;
 }
 
-  }
+/**
+ * @deprecated Use destroy() instead
+ */
+dispose(): void {
+  this.destroy();
 }
