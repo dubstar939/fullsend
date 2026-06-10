@@ -338,37 +338,24 @@ export class Engine {
   /**
    * Cleanup and dispose resources
    */
-  destroy(): void {
-    // Stop the game loop
-    this.stop();
-    
-    // Cancel any pending animation frame
-    if (this.animationId !== null) {
-      cancelAnimationFrame(this.animationId);
-      this.animationId = null;
-    }
-    
-    // Dispose renderer and force context loss
-    this.renderer.dispose();
-    
-    // Dispose other systems
-    this.assetLoader.dispose();
-    this.sceneGraph.dispose();
-    this.inputSystem.dispose();
-    
-    // Clear scene
-    while (this.scene.children.length > 0) {
-      const obj = this.scene.children[0];
-      this.scene.remove(obj);
-    }
-    
-    this.isRunning = false;
+this.scene.traverse((obj: any) => {
+  if (obj.geometry) {
+    obj.geometry.dispose();
   }
-  
-  /**
-   * @deprecated Use destroy() instead
-   */
-  dispose(): void {
-    this.destroy();
+
+  if (obj.material) {
+    if (Array.isArray(obj.material)) {
+      obj.material.forEach((m) => m.dispose());
+    } else {
+      obj.material.dispose();
+    }
+  }
+});
+
+// THEN clear scene
+while (this.scene.children.length > 0) {
+  this.scene.remove(this.scene.children[0]);
+}
+
   }
 }
