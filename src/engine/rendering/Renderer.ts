@@ -12,9 +12,11 @@ export class Renderer {
   private config: EngineConfig;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private _debugMode: boolean = false;
+  private canvas: HTMLCanvasElement;
   
   constructor(canvas: HTMLCanvasElement, config: EngineConfig) {
     this.config = config;
+    this.canvas = canvas;
     
     // Create WebGL renderer with optimized settings
     this.renderer = new THREE.WebGLRenderer({
@@ -27,7 +29,11 @@ export class Renderer {
     // Configure renderer for low-poly style
     // Cap pixel ratio at 1.5 for better mobile performance
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Use canvas size, not window size
+    const width = canvas.clientWidth || canvas.width;
+    const height = canvas.clientHeight || canvas.height;
+    this.renderer.setSize(width, height);
     this.renderer.setClearColor(0x87ceeb, 1);
     
     // Shadow configuration
@@ -43,7 +49,7 @@ export class Renderer {
     // Create perspective camera
     this.camera = new THREE.PerspectiveCamera(
       75,
-      window.innerWidth / window.innerHeight,
+      width / height,
       0.1,
       1000
     );
@@ -129,9 +135,23 @@ export class Renderer {
   }
   
   /**
-   * Cleanup resources
+   * Cleanup resources - fully destroy WebGL context
    */
   dispose(): void {
+    // Force context loss to ensure complete cleanup
+    const gl = this.renderer.getContext() as WebGLRenderingContext;
+    if (gl) {
+      // Trigger context loss
+      const ext = gl.getExtension('WEBGL_lose_context');
+      if (ext) {
+        ext.loseContext();
+      }
+    }
+    
+    // Dispose renderer
     this.renderer.dispose();
+    
+    // Clear canvas reference
+    this.canvas = null as unknown as HTMLCanvasElement;
   }
 }

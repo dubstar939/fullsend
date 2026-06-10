@@ -63,6 +63,7 @@ export class Engine {
   private lastFrameTime: number = 0;
   private accumulator: number = 0;
   private onFrameCallback?: (deltaTime: number) => void;
+  private animationId: number | null = null;
   
   constructor(
     canvas: HTMLCanvasElement,
@@ -238,7 +239,7 @@ export class Engine {
     this.render();
     this.performanceMonitor.endFrame();
     
-    requestAnimationFrame(this.gameLoop);
+    this.animationId = requestAnimationFrame(this.gameLoop);
   };
   
   /**
@@ -337,11 +338,37 @@ export class Engine {
   /**
    * Cleanup and dispose resources
    */
-  dispose(): void {
+  destroy(): void {
+    // Stop the game loop
     this.stop();
+    
+    // Cancel any pending animation frame
+    if (this.animationId !== null) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+    
+    // Dispose renderer and force context loss
     this.renderer.dispose();
+    
+    // Dispose other systems
     this.assetLoader.dispose();
     this.sceneGraph.dispose();
     this.inputSystem.dispose();
+    
+    // Clear scene
+    while (this.scene.children.length > 0) {
+      const obj = this.scene.children[0];
+      this.scene.remove(obj);
+    }
+    
+    this.isRunning = false;
+  }
+  
+  /**
+   * @deprecated Use destroy() instead
+   */
+  dispose(): void {
+    this.destroy();
   }
 }
