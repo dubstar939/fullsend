@@ -220,7 +220,7 @@ stop(): void {
     cancelAnimationFrame(this.animationId);
     this.animationId = null;
   }
-}
+
 
   
   /**
@@ -347,9 +347,7 @@ stop(): void {
   /**
    * Cleanup and dispose resources
    */
-/**
- * Cleanup and dispose resources
- */
+
 destroy(): void {
   // Stop loop safely
   this.isRunning = false;
