@@ -3,5 +3,13 @@
 dist/
 build/
 *.js
-*.css
+
+# Dependencies
+node_modules/
+
+# Editors
+.vscode/
+
+# Logs
+*.log
 ```
