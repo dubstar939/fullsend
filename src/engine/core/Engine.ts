@@ -394,9 +394,10 @@ destroy(): void {
   this.accumulator = 0;
 }
 
-/**
- * @deprecated Use destroy() instead
- */
+  /**
+   * @deprecated Use destroy() instead
+   */
   dispose(): void {
-  this.destroy();
+    this.destroy();
+  }
 }

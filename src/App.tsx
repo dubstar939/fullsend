@@ -124,9 +124,10 @@ const App: React.FC = () => {
       {screen === 'PLAYING' && (
         <div className="relative w-full h-full">
           <Game 
-            key={`game-${gameState.selectedCarIndex}`} // Force remount on car change to apply new color
+            key={`game-${gameState.selectedCarIndex}`} // Force remount on car change to apply new stats/model
             onGameOver={handleGameOver} 
             carColor={gameState.cars[gameState.selectedCarIndex].color}
+            selectedCarIndex={gameState.selectedCarIndex}
           />
         </div>
       )}
