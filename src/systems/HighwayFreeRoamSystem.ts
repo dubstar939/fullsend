@@ -151,13 +151,13 @@ export class HighwayFreeRoamSystem {
    */
   private setupEventHandlers(): void {
     // Rival challenge events
-    this.rivalSpawner.onChallengeInitiated((rival) => {
+    this.rivalSpawner.setOnChallengeInitiated((rival) => {
       if (this.events.onRivalChallenge) {
         this.events.onRivalChallenge(rival);
       }
     });
     
-    this.rivalSpawner.onRivalDefeated((rival) => {
+    this.rivalSpawner.setOnRivalDefeated((rival) => {
       if (this.events.onRivalDefeated) {
         this.events.onRivalDefeated(rival);
       }
