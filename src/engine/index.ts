@@ -26,7 +26,6 @@ export type { SceneNode, SceneNodeType } from './core/SceneGraph';
 
 // Asset Management
 export { AssetLoader } from './assets/AssetLoader';
-export { AssetBundle } from './assets/AssetBundle';
 export type { AssetManifest, LoadedAssets } from './assets/AssetLoader';
 
 // Systems
@@ -34,6 +33,8 @@ export { InputSystem } from './systems/InputSystem';
 export { CameraSystem } from './systems/CameraSystem';
 export { CullingSystem } from './systems/CullingSystem';
 export { LODSystem } from './systems/LODSystem';
+export { EnvironmentSystem } from './systems/EnvironmentSystem';
+export type { EnvironmentConfig } from './systems/EnvironmentSystem';
 
 // Utilities
 export { ObjectPool } from './core/ObjectPool';
