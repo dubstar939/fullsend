@@ -370,8 +370,9 @@ export class ZoneManager {
       [ZoneType.MOUNTAIN]: ['Peak', 'Summit', 'Alpine', 'Highland'],
     };
     
+    const numZoneTypes = 7; // Total number of zone types
     const prefix = prefixes[type][index % prefixes[type].length];
-    return `${prefix} Zone ${Math.floor(index / zoneTypes.length) + 1}`;
+    return `${prefix} Zone ${Math.floor(index / numZoneTypes) + 1}`;
   }
 
   /**
