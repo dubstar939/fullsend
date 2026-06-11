@@ -397,6 +397,6 @@ destroy(): void {
 /**
  * @deprecated Use destroy() instead
  */
-dispose(): void {
+  dispose(): void {
   this.destroy();
 }
