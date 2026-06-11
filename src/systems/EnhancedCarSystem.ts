@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { CarDefinition } from '../types/car.types';
 import { parseColor } from '../engine/factories/CarFactory';
+import { InputAxis } from '../engine/systems/InputSystem';
 
 export interface CarStats {
   speed: number;
@@ -24,6 +25,18 @@ export interface CarVisualConfig {
   hasSpoiler: boolean;
   hasWideBody: boolean;
   bodyShape: 'sedan' | 'coupe' | 'sports' | 'muscle' | 'compact';
+}
+
+export interface CarPhysicsState {
+  velocity: THREE.Vector3;
+  acceleration: THREE.Vector3;
+  speed: number;
+  steerAngle: number;
+  targetSteerAngle: number;
+  lanePosition: number; // -1 to 1 for lane interpolation
+  targetLanePosition: number;
+  isLaneChanging: boolean;
+  laneChangeProgress: number;
 }
 
 /**
@@ -535,11 +548,31 @@ export class EnhancedCarModel {
 }
 
 /**
- * Car Manager - Handles car swapping and lifecycle
+ * Car Manager - Handles car swapping and lifecycle with physics-based movement
  */
 export class CarManager {
   private currentCar?: EnhancedCarModel;
   private sceneObjects: THREE.Object3D[] = [];
+  
+  // Physics state for smooth movement
+  private physicsState: CarPhysicsState = {
+    velocity: new THREE.Vector3(0, 0, 0),
+    acceleration: new THREE.Vector3(0, 0, 0),
+    speed: 0,
+    steerAngle: 0,
+    targetSteerAngle: 0,
+    lanePosition: 0,
+    targetLanePosition: 0,
+    isLaneChanging: false,
+    laneChangeProgress: 0,
+  };
+  
+  // Car stats modifiers
+  private maxSpeed: number = 1.0;
+  private accelerationRate: number = 0.5;
+  private brakingRate: number = 0.8;
+  private handlingFactor: number = 0.7;
+  private gripFactor: number = 0.6;
 
   /**
    * Create and add car to scene
@@ -547,10 +580,17 @@ export class CarManager {
   createCar(definition: CarDefinition, visualConfig: CarVisualConfig): THREE.Group {
     // Dispose existing car
     this.disposeCurrentCar();
-    
+
     // Create new enhanced car
     this.currentCar = new EnhancedCarModel(definition, visualConfig);
     
+    // Initialize physics based on car stats
+    const stats = definition.baseStats;
+    this.maxSpeed = stats.speed / 100;
+    this.accelerationRate = stats.acceleration / 100;
+    this.handlingFactor = stats.handling / 100;
+    this.gripFactor = stats.grip / 100;
+
     return this.currentCar.mesh;
   }
 
@@ -578,6 +618,121 @@ export class CarManager {
   }
 
   /**
+   * Update car physics with input
+   */
+  update(deltaTime: number, inputAxis: InputAxis): THREE.Vector3 {
+    const { steer, throttle, brake } = inputAxis;
+    
+    // Smooth steering with handling factor
+    this.physicsState.targetSteerAngle = steer * this.handlingFactor;
+    this.physicsState.steerAngle += (this.physicsState.targetSteerAngle - this.physicsState.steerAngle) * 10 * deltaTime;
+    
+    // Acceleration/deceleration curves
+    if (throttle > 0) {
+      const targetSpeed = throttle * this.maxSpeed;
+      const accel = this.accelerationRate * (1 - this.physicsState.speed / this.maxSpeed);
+      this.physicsState.speed += accel * throttle * deltaTime * 60;
+      this.physicsState.speed = Math.min(this.physicsState.speed, targetSpeed);
+    } else if (brake > 0) {
+      // Braking
+      this.physicsState.speed -= this.brakingRate * brake * deltaTime * 60;
+      this.physicsState.speed = Math.max(this.physicsState.speed, 0);
+    } else {
+      // Natural deceleration (drag)
+      this.physicsState.speed *= 0.995;
+    }
+    
+    // Clamp speed
+    this.physicsState.speed = Math.max(0, Math.min(this.physicsState.speed, this.maxSpeed));
+    
+    // Lane changing logic
+    const targetLane = steer !== 0 ? steer : 0;
+    if (Math.abs(targetLane - this.physicsState.lanePosition) > 0.01 && Math.abs(steer) > 0.1) {
+      this.physicsState.isLaneChanging = true;
+      this.physicsState.targetLanePosition = targetLane;
+    }
+    
+    if (this.physicsState.isLaneChanging) {
+      this.physicsState.laneChangeProgress += deltaTime * 3;
+      const t = Math.min(1, this.physicsState.laneChangeProgress);
+      
+      // Smooth lane transition with ease-out
+      const easedT = 1 - Math.pow(1 - t, 3);
+      this.physicsState.lanePosition = 
+        this.physicsState.lanePosition + (this.physicsState.targetLanePosition - this.physicsState.lanePosition) * easedT * deltaTime * 5;
+      
+      if (t >= 0.99) {
+        this.physicsState.isLaneChanging = false;
+        this.physicsState.laneChangeProgress = 0;
+        this.physicsState.lanePosition = this.physicsState.targetLanePosition;
+      }
+    }
+    
+    // Apply lateral movement based on lane position
+    const lateralSpeed = this.physicsState.lanePosition * this.physicsState.speed * 0.5;
+    
+    // Calculate velocity vector
+    this.physicsState.velocity.set(
+      lateralSpeed * deltaTime * 60,
+      0,
+      -this.physicsState.speed * deltaTime * 60
+    );
+    
+    // Apply to mesh
+    if (this.currentCar) {
+      this.currentCar.mesh.position.add(this.physicsState.velocity);
+      
+      // Add slight body roll during lane changes
+      const bodyRoll = this.physicsState.steerAngle * 0.05;
+      this.currentCar.mesh.rotation.z = bodyRoll;
+      
+      // Pitch during acceleration/braking
+      const pitch = (throttle - brake) * 0.02;
+      this.currentCar.mesh.rotation.x = pitch;
+    }
+    
+    return this.physicsState.velocity.clone();
+  }
+
+  /**
+   * Get current speed
+   */
+  getSpeed(): number {
+    return this.physicsState.speed;
+  }
+
+  /**
+   * Get current lane position (-1 to 1)
+   */
+  getLanePosition(): number {
+    return this.physicsState.lanePosition;
+  }
+
+  /**
+   * Check if currently changing lanes
+   */
+  isLaneChanging(): boolean {
+    return this.physicsState.isLaneChanging;
+  }
+
+  /**
+   * Reset physics state
+   */
+  resetPhysics(): void {
+    this.physicsState = {
+      velocity: new THREE.Vector3(0, 0, 0),
+      acceleration: new THREE.Vector3(0, 0, 0),
+      speed: 0,
+      steerAngle: 0,
+      targetSteerAngle: 0,
+      lanePosition: 0,
+      targetLanePosition: 0,
+      isLaneChanging: false,
+      laneChangeProgress: 0,
+    };
+  }
+
+  /**
    * Dispose current car
    */
   disposeCurrentCar(): void {
@@ -585,10 +740,12 @@ export class CarManager {
       this.currentCar.dispose();
       this.currentCar = undefined;
     }
-    
+
     // Remove scene objects
     this.sceneObjects.forEach(obj => obj.removeFromParent());
     this.sceneObjects = [];
+    
+    this.resetPhysics();
   }
 
   /**

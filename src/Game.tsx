@@ -4,6 +4,7 @@ import { CarManager } from './systems/EnhancedCarSystem';
 import { CAR_DEFINITIONS } from './types/CarDefinitions';
 import { HighwayTrack, RoadMeshBuilder } from './systems/TrackSystem';
 import { HighwayFreeRoamSystem, FreeRoamEvents } from './systems/HighwayFreeRoamSystem';
+import { PolishEffectsSystem, EffectType } from './systems/PolishEffectsSystem';
 import * as THREE from 'three';
 
 interface GameProps {
@@ -20,10 +21,12 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
   const trackRef = useRef<HighwayTrack | null>(null);
   const roadBuilderRef = useRef<RoadMeshBuilder | null>(null);
   const freeRoamRef = useRef<HighwayFreeRoamSystem | null>(null);
+  const polishEffectsRef = useRef<PolishEffectsSystem | null>(null);
   
   const [currentScore, setCurrentScore] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [distance, setDistance] = useState(0);
+  const [speedLevel, setSpeedLevel] = useState(1);
   
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -45,6 +48,10 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
       hemisphereGroundColor: 0x3d2817,
     });
     environmentRef.current = envSystem;
+    
+    // Initialize polish effects system
+    const polishEffects = new PolishEffectsSystem(engine.scene, engine.sceneGraph);
+    polishEffectsRef.current = polishEffects;
     
     // Initialize track system
     trackRef.current = new HighwayTrack();
@@ -77,9 +84,27 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
     engine.addObject(carMesh, 'playerCar');
     engine.setCameraTarget(carMesh);
 
+    // Setup audio hooks for polish effects
+    polishEffects.onAudioEvent('collision', () => {
+      // Audio hook - can be connected to actual sound system
+      console.log('Collision sound triggered');
+    });
+    polishEffects.onAudioEvent('coin', () => {
+      console.log('Coin collection sound triggered');
+    });
+
     // Initialize Highway Free Roam System for traffic and collision detection
     const freeRoamEvents: FreeRoamEvents = {
       onTrafficCollision: (vehicle) => {
+        // Trigger collision effect
+        if (polishEffectsRef.current) {
+          polishEffectsRef.current.triggerEffect({
+            type: 'collision',
+            position: carMesh.position.clone(),
+            intensity: 1.5,
+          });
+        }
+        
         // Trigger game over on collision
         const finalScore = currentScore;
         const earnedCoins = Math.floor(finalScore / 10);
@@ -101,23 +126,59 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
     // Start the engine
     let gameTime = 0;
     let lastPlayerPos = new THREE.Vector3();
+    let progressiveSpeedMultiplier = 1.0;
+    
     engine.start((deltaTime) => {
       gameTime += deltaTime;
+      
+      // Get input from engine's input system
+      const inputAxis = engine.inputSystem.getAxis();
+      
+      // Update car physics with smooth controls
+      if (carManagerRef.current) {
+        carManagerRef.current.update(deltaTime, inputAxis);
+      }
       
       // Update player position for collision detection
       const playerPos = carMesh.position.clone();
       const playerSpeedVec = playerPos.clone().sub(lastPlayerPos).divideScalar(deltaTime || 0.016);
       lastPlayerPos.copy(playerPos);
       
+      // Get current speed from car manager
+      const carSpeed = carManagerRef.current?.getSpeed() ?? 0;
+      setCurrentSpeed(carSpeed);
+      
+      // Progressive difficulty - speed increases over time
+      progressiveSpeedMultiplier = 1.0 + Math.min(gameTime * 0.01, 0.5); // Max 50% increase
+      
       // Update free roam system (traffic, collisions)
       if (freeRoamRef.current) {
-        freeRoamRef.current.update(deltaTime, playerPos, playerSpeedVec.length(), playerSpeedVec.clone().normalize());
+        freeRoamRef.current.update(deltaTime, playerPos, carSpeed * progressiveSpeedMultiplier);
       }
       
-      // Update score based on distance and speed
-      const speedBonus = Math.floor(currentSpeed * 0.1);
+      // Update polish effects
+      if (polishEffectsRef.current) {
+        polishEffectsRef.current.update(deltaTime, carSpeed);
+      }
+      
+      // Update score based on distance and speed with progressive multiplier
+      const speedBonus = Math.floor(carSpeed * 0.1 * progressiveSpeedMultiplier);
       setCurrentScore(prev => prev + Math.floor(deltaTime * (10 + speedBonus)));
-      setDistance(prev => prev + Math.floor(currentSpeed * deltaTime * 10));
+      setDistance(prev => prev + Math.floor(carSpeed * deltaTime * 10));
+      
+      // Speed level feedback
+      const newSpeedLevel = Math.floor(carSpeed * 10) + 1;
+      if (newSpeedLevel !== speedLevel) {
+        setSpeedLevel(newSpeedLevel);
+        // Trigger speed effect at milestone speeds
+        if (newSpeedLevel % 5 === 0 && polishEffectsRef.current) {
+          polishEffectsRef.current.triggerEffect({
+            type: 'speed',
+            position: playerPos.clone(),
+            intensity: 0.8,
+          });
+        }
+      }
       
       // Extend track as needed
       if (track && track.shouldExtendTrack(-gameTime * 50, 200)) {
@@ -133,9 +194,11 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
         track.cleanupOldSegments(-gameTime * 50, 50);
       }
       
-      // Update shadow target
-      if (environmentRef.current) {
-        environmentRef.current.updateShadowTarget(carMesh.position);
+      // Update shadow target with camera shake offset
+      if (environmentRef.current && polishEffectsRef.current) {
+        const shakeOffset = polishEffectsRef.current.getCameraOffset();
+        const adjustedPos = carMesh.position.clone().add(shakeOffset);
+        environmentRef.current.updateShadowTarget(adjustedPos);
       }
     });
 
@@ -155,6 +218,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
     return () => {
       window.removeEventListener('resize', handleResize);
       freeRoamRef.current?.dispose();
+      polishEffectsRef.current?.dispose();
       carManager.dispose();
       roadBuilder?.dispose();
       environmentRef.current?.dispose();
@@ -165,6 +229,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
       trackRef.current = null;
       roadBuilderRef.current = null;
       freeRoamRef.current = null;
+      polishEffectsRef.current = null;
     };
   }, [carColor, selectedCarIndex]);
 
