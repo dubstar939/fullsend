@@ -845,15 +845,15 @@ export class RivalSpawner {
   /**
    * Set callbacks
    */
-  onRivalSpawned(callback: (rival: SpawnedRival) => void): void {
+  setOnRivalSpawned(callback: (rival: SpawnedRival) => void): void {
     this.onRivalSpawned = callback;
   }
 
-  onChallengeInitiated(callback: (rival: SpawnedRival) => void): void {
+  setOnChallengeInitiated(callback: (rival: SpawnedRival) => void): void {
     this.onChallengeInitiated = callback;
   }
 
-  onRivalDefeated(callback: (rival: SpawnedRival) => void): void {
+  setOnRivalDefeated(callback: (rival: SpawnedRival) => void): void {
     this.onRivalDefeated = callback;
   }
 
