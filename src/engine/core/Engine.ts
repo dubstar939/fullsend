@@ -109,8 +109,9 @@ export class Engine {
     this.artDirector = new LowPolyArtDirector();
     
     // Initialize performance monitor
+      this.performanceMonitor.beginFrame();
     this.performanceMonitor = new PerformanceMonitor();
-    
+      
     // Setup default lighting
     this.setupDefaultLighting();
   }
@@ -219,7 +220,7 @@ stop(): void {
     cancelAnimationFrame(this.animationId);
     this.animationId = null;
   }
-
+  }
 
   
   /**
@@ -255,7 +256,7 @@ stop(): void {
    */
   private update(deltaTime: number): void {
     // Update performance metrics
-    this.performanceMonitor.beginFrame();
+
     
     // Update input
     this.inputSystem.update(deltaTime);
