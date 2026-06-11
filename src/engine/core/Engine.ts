@@ -109,7 +109,7 @@ export class Engine {
     this.artDirector = new LowPolyArtDirector();
     
     // Initialize performance monitor
-      this.performanceMonitor.beginFrame();
+    
     this.performanceMonitor = new PerformanceMonitor();
       
     // Setup default lighting
@@ -228,6 +228,9 @@ stop(): void {
    */
   private gameLoop = (): void => {
     if (!this.isRunning) return;
+
+    this.performanceMonitor.beginFrame();
+
     
     const currentTime = performance.now();
     let deltaTime = (currentTime - this.lastFrameTime) / 1000;
