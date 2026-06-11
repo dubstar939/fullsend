@@ -207,7 +207,6 @@ export class Engine {
   this.gameLoop();
 }
 
-  }
   
   /**
    * Stop the engine game loop
