@@ -1,1 +1,24 @@
-Nothing should be ignored based on the provided file changes. The only modified file is a TypeScript source file (`src/systems/RivalSpawner.ts`), which should not be added to .gitignore.
+```
+# Build artifacts
+dist/
+build/
+*.js
+*.css
+
+# Dependencies
+node_modules/
+
+# Editors
+.vscode/
+.idea/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
+```

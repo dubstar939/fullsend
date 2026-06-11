@@ -158,7 +158,7 @@ export class HighwayLoopManager {
         break;
     }
 
-    const mesh = this.buildSegmentMesh(selectedType, length, curvature, elevationChange);
+    const mesh = this.buildSegmentMesh(selectedType, length, curvature, elevationChange, startZ);
     
     const segment: HighwaySegment = {
       id: `segment_${this.segmentIdCounter++}`,
@@ -184,7 +184,8 @@ export class HighwayLoopManager {
     type: SegmentType,
     length: number,
     curvature: number,
-    elevationChange: number
+    elevationChange: number,
+    startZ: number
   ): THREE.Group {
     const group = new THREE.Group();
     const roadWidth = TRAFFIC_CONFIG.LANE_COUNT * TRAFFIC_CONFIG.LANE_WIDTH;
