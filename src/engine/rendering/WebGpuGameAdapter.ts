@@ -3,10 +3,10 @@
  * Bridges the gap between game logic and WebGPU rendering backend
  */
 
-import { WebGPURenderer, WebGPUMesh, WebGPUMaterial, WebGPURenderable, Transform } from '../../render/webgpu';
-import { Camera } from '../../render/common/Camera';
-import type { ILight, LightType } from '../../types/engine.types';
-import { LightType as LT } from '../../types/engine.types';
+import { WebGPURenderer, WebGPUMesh, WebGPUMaterial, WebGPURenderable, Transform } from '../../../render/webgpu';
+import { Camera } from '../../../render/common/Camera';
+import type { ILight, LightType } from '../../../types/engine.types';
+import { LightType as LT } from '../../../types/engine.types';
 
 // ============================================================================
 // Vehicle Factory for WebGPU

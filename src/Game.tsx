@@ -3,6 +3,8 @@ import { Engine, EnvironmentSystem } from './engine';
 import { CarManager } from './systems/EnhancedCarSystem';
 import { CAR_DEFINITIONS } from './types/CarDefinitions';
 import { HighwayTrack, RoadMeshBuilder } from './systems/TrackSystem';
+import { HighwayFreeRoamSystem, FreeRoamEvents } from './systems/HighwayFreeRoamSystem';
+import * as THREE from 'three';
 
 interface GameProps {
   onGameOver: (score: number, coins: number) => void;
@@ -17,6 +19,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
   const environmentRef = useRef<EnvironmentSystem | null>(null);
   const trackRef = useRef<HighwayTrack | null>(null);
   const roadBuilderRef = useRef<RoadMeshBuilder | null>(null);
+  const freeRoamRef = useRef<HighwayFreeRoamSystem | null>(null);
   
   const [currentScore, setCurrentScore] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
@@ -74,10 +77,42 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
     engine.addObject(carMesh, 'playerCar');
     engine.setCameraTarget(carMesh);
 
+    // Initialize Highway Free Roam System for traffic and collision detection
+    const freeRoamEvents: FreeRoamEvents = {
+      onTrafficCollision: (vehicle) => {
+        // Trigger game over on collision
+        const finalScore = currentScore;
+        const earnedCoins = Math.floor(finalScore / 10);
+        onGameOver(finalScore, earnedCoins);
+      },
+    };
+    
+    const freeRoamSystem = new HighwayFreeRoamSystem(
+      engine.scene,
+      {
+        trafficDensity: 0.7,
+        playerSpeed: 0,
+        timeOfDay: 18,
+      },
+      freeRoamEvents
+    );
+    freeRoamRef.current = freeRoamSystem;
+
     // Start the engine
     let gameTime = 0;
+    let lastPlayerPos = new THREE.Vector3();
     engine.start((deltaTime) => {
       gameTime += deltaTime;
+      
+      // Update player position for collision detection
+      const playerPos = carMesh.position.clone();
+      const playerSpeedVec = playerPos.clone().sub(lastPlayerPos).divideScalar(deltaTime || 0.016);
+      lastPlayerPos.copy(playerPos);
+      
+      // Update free roam system (traffic, collisions)
+      if (freeRoamRef.current) {
+        freeRoamRef.current.update(deltaTime, playerPos, playerSpeedVec.length(), playerSpeedVec.clone().normalize());
+      }
       
       // Update score based on distance and speed
       const speedBonus = Math.floor(currentSpeed * 0.1);
@@ -119,6 +154,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
     // Cleanup on unmount
     return () => {
       window.removeEventListener('resize', handleResize);
+      freeRoamRef.current?.dispose();
       carManager.dispose();
       roadBuilder?.dispose();
       environmentRef.current?.dispose();
@@ -128,6 +164,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
       environmentRef.current = null;
       trackRef.current = null;
       roadBuilderRef.current = null;
+      freeRoamRef.current = null;
     };
   }, [carColor, selectedCarIndex]);
 
