@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Engine, EnvironmentSystem } from './engine';
+import { PlayerCar } from './entities/PlayerCar';
 import { CarManager } from './systems/EnhancedCarSystem';
 import { CAR_DEFINITIONS } from './types/CarDefinitions';
 import { HighwayTrack, RoadMeshBuilder } from './systems/TrackSystem';
 import { HighwayFreeRoamSystem, FreeRoamEvents } from './systems/HighwayFreeRoamSystem';
 import { PolishEffectsSystem, EffectType } from './systems/PolishEffectsSystem';
+import { INITIAL_CARS } from './config/gameConfig';
 import * as THREE from 'three';
 
 interface GameProps {
@@ -16,6 +18,7 @@ interface GameProps {
 const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
+  const playerCarRef = useRef<PlayerCar | null>(null);
   const carManagerRef = useRef<CarManager | null>(null);
   const environmentRef = useRef<EnvironmentSystem | null>(null);
   const trackRef = useRef<HighwayTrack | null>(null);
@@ -27,6 +30,8 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [distance, setDistance] = useState(0);
   const [speedLevel, setSpeedLevel] = useState(1);
+  const [nitrousLevel, setNitrousLevel] = useState(100);
+  const [isNitrousActive, setIsNitrousActive] = useState(false);
   
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -65,12 +70,13 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
       engine.addObject(roadGroup, `road_${segment.startZ}`);
     });
 
-    // Initialize car manager and create player car
+    // Initialize car manager and create player car mesh
     const carManager = new CarManager();
     carManagerRef.current = carManager;
     
     // Get car definition based on selected index
     const carDefinition = CAR_DEFINITIONS[selectedCarIndex % CAR_DEFINITIONS.length];
+    const carStats = INITIAL_CARS[selectedCarIndex % INITIAL_CARS.length];
     const carMesh = carManager.createCar(carDefinition, {
       primaryColor: carColor,
       secondaryColor: '#1a1a2e',
@@ -82,11 +88,21 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
     });
     
     engine.addObject(carMesh, 'playerCar');
+    
+    // Initialize PlayerCar physics entity with actual car stats
+    const playerCar = new PlayerCar(carMesh, {
+      speed: carStats.speed,
+      handling: carStats.handling,
+      acceleration: carStats.acceleration,
+      grip: carStats.grip,
+    });
+    playerCarRef.current = playerCar;
+    
+    // Set camera to follow player car
     engine.setCameraTarget(carMesh);
 
     // Setup audio hooks for polish effects
     polishEffects.onAudioEvent('collision', () => {
-      // Audio hook - can be connected to actual sound system
       console.log('Collision sound triggered');
     });
     polishEffects.onAudioEvent('coin', () => {
@@ -97,12 +113,15 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
     const freeRoamEvents: FreeRoamEvents = {
       onTrafficCollision: (vehicle) => {
         // Trigger collision effect
-        if (polishEffectsRef.current) {
+        if (polishEffectsRef.current && playerCarRef.current) {
           polishEffectsRef.current.triggerEffect({
             type: 'collision',
-            position: carMesh.position.clone(),
+            position: playerCarRef.current.getPosition(),
             intensity: 1.5,
           });
+          
+          // Apply collision penalty to player
+          playerCarRef.current.takeCollisionPenalty();
         }
         
         // Trigger game over on collision
@@ -110,14 +129,25 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
         const earnedCoins = Math.floor(finalScore / 10);
         onGameOver(finalScore, earnedCoins);
       },
+      onRivalChallenge: (rival) => {
+        console.log('Rival challenge initiated:', rival.definition.id);
+      },
+      onZoneEntered: (zoneName, properties) => {
+        console.log('Entered zone:', zoneName, 'Traffic density:', properties.trafficDensity);
+      },
     };
     
     const freeRoamSystem = new HighwayFreeRoamSystem(
       engine.scene,
       {
-        trafficDensity: 0.7,
-        playerSpeed: 0,
-        timeOfDay: 18,
+        enableTraffic: true,
+        enableRivals: true,
+        enableFlashChallenge: true,
+        enableZones: true,
+        maxTrafficVehicles: 50,
+        maxActiveRivals: 8,
+        timeOfDay: 20,
+        weather: 'clear',
       },
       freeRoamEvents
     );
@@ -134,24 +164,37 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
       // Get input from engine's input system
       const inputAxis = engine.inputSystem.getAxis();
       
-      // Update car physics with smooth controls
-      if (carManagerRef.current) {
-        carManagerRef.current.update(deltaTime, inputAxis);
+      // Check for nitrous activation (Left Shift or gamepad button)
+      const inputState = engine.inputSystem.getState();
+      if (inputState.nitrous && playerCarRef.current) {
+        if (!playerCarRef.current.state.isNitrousActive) {
+          playerCarRef.current.activateNitrous();
+        }
+      } else if (playerCarRef.current) {
+        playerCarRef.current.deactivateNitrous();
       }
       
-      // Update player position for collision detection
-      const playerPos = carMesh.position.clone();
-      const playerSpeedVec = playerPos.clone().sub(lastPlayerPos).divideScalar(deltaTime || 0.016);
-      lastPlayerPos.copy(playerPos);
+      // Update PlayerCar physics with input - THIS IS THE KEY INTEGRATION
+      if (playerCarRef.current) {
+        playerCarRef.current.update(inputAxis, deltaTime);
+        
+        // Sync nitrous state to UI
+        setNitrousLevel(playerCarRef.current.getNitrousLevel());
+        setIsNitrousActive(playerCarRef.current.state.isNitrousActive);
+      }
       
-      // Get current speed from car manager
-      const carSpeed = carManagerRef.current?.getSpeed() ?? 0;
+      // Update player position from PlayerCar physics
+      const playerPos = playerCarRef.current?.getPosition() ?? new THREE.Vector3();
+      const carSpeed = playerCarRef.current?.getSpeed() ?? 0;
       setCurrentSpeed(carSpeed);
       
-      // Progressive difficulty - speed increases over time
-      progressiveSpeedMultiplier = 1.0 + Math.min(gameTime * 0.01, 0.5); // Max 50% increase
+      // Update last position for next frame
+      lastPlayerPos.copy(playerPos);
       
-      // Update free roam system (traffic, collisions)
+      // Progressive difficulty - speed increases over time
+      progressiveSpeedMultiplier = 1.0 + Math.min(gameTime * 0.01, 0.5);
+      
+      // Update free roam system with actual player position and speed
       if (freeRoamRef.current) {
         freeRoamRef.current.update(deltaTime, playerPos, carSpeed * progressiveSpeedMultiplier);
       }
@@ -170,7 +213,6 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
       const newSpeedLevel = Math.floor(carSpeed * 10) + 1;
       if (newSpeedLevel !== speedLevel) {
         setSpeedLevel(newSpeedLevel);
-        // Trigger speed effect at milestone speeds
         if (newSpeedLevel % 5 === 0 && polishEffectsRef.current) {
           polishEffectsRef.current.triggerEffect({
             type: 'speed',
@@ -197,7 +239,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
       // Update shadow target with camera shake offset
       if (environmentRef.current && polishEffectsRef.current) {
         const shakeOffset = polishEffectsRef.current.getCameraOffset();
-        const adjustedPos = carMesh.position.clone().add(shakeOffset);
+        const adjustedPos = playerPos.clone().add(shakeOffset);
         environmentRef.current.updateShadowTarget(adjustedPos);
       }
     });
@@ -269,12 +311,26 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
         </div>
       </div>
       
+      {/* Nitrous gauge */}
+      <div className="absolute bottom-32 left-8 text-white pointer-events-none drop-shadow-md z-10">
+        <div className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">Nitrous</div>
+        <div className="w-48 h-6 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
+          <div 
+            className={`h-full transition-all duration-200 ${isNitrousActive ? 'bg-gradient-to-r from-blue-400 to-cyan-400 animate-pulse' : 'bg-gradient-to-r from-blue-600 to-blue-400'}`}
+            style={{ width: `${nitrousLevel}%` }}
+          />
+        </div>
+        {isNitrousActive && (
+          <div className="text-xs text-cyan-400 font-bold mt-1 animate-pulse">ACTIVE!</div>
+        )}
+      </div>
+      
       {/* Controls Help */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-4 text-white opacity-50 text-sm font-bold pointer-events-none">
         <div className="px-3 py-2 bg-black/50 rounded border border-white/20">W / UP: ACCEL</div>
         <div className="px-3 py-2 bg-black/50 rounded border border-white/20">A-D / LEFT-RIGHT: STEER</div>
         <div className="px-3 py-2 bg-black/50 rounded border border-white/20">S / DOWN: BRAKE</div>
-        <div className="px-3 py-2 bg-black/50 rounded border border-white/20">ESC: QUIT</div>
+        <div className="px-3 py-2 bg-black/50 rounded border border-white/20">LSHIFT: NITROUS</div>
       </div>
     </div>
   );
