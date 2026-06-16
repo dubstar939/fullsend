@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { RivalAggression } from './RivalComponent';
+import { RivalAggression } from '../rivals/RivalComponent';
 
 export enum AIState {
   /** Cruising normally on highway */
@@ -83,7 +83,7 @@ export class AIComponent {
   
   constructor(config: Partial<AIComponentConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.currentState = AIState.CRUISIN​G;
+    this.currentState = AIState.CRUISING
     
     this.position = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
@@ -121,7 +121,7 @@ export class AIComponent {
     let output: SteeringOutput;
     
     switch (this.currentState) {
-      case AIState.CRUISIN​G:
+      case AIState.CRUISING:
         output = this.updateCruising(deltaTime, playerPosition);
         break;
       case AIState.APPROACHING_PLAYER:
@@ -279,7 +279,7 @@ export class AIComponent {
    * Reset AI to cruising
    */
   resetToCruising(): void {
-    this.setState(AIState.CRUISIN​G);
+    this.setState(AIState.CRUISING);
     this.isRespondingToChallenge = false;
     this.challengeResponseTimer = 0;
     this.targetSpeed = this.getCruiseSpeed();

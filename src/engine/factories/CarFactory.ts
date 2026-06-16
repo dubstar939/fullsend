@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { CarDefinition } from '../types/car.types';
+import { CarDefinition } from '../../types/car.types';
 
 export interface CarModelConfig {
   bodyShape: 'sedan' | 'coupe' | 'sports' | 'muscle' | 'compact';
