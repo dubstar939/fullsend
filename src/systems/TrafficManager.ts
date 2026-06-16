@@ -21,6 +21,11 @@ export interface TrafficVehicle {
   laneChangeProgress: number;
   isActive: boolean;
   zPosition: number;
+  // Cached transforms for performance
+  _cachedMatrix?: THREE.Matrix4;
+  _cachedRotation?: THREE.Euler;
+  _cachedQuaternion?: THREE.Quaternion;
+  _cachedScale?: THREE.Vector3;
 }
 
 export interface TrafficManagerConfig {
@@ -62,6 +67,9 @@ export class TrafficManager {
   // Instance pool management
   private freeIndices: number[] = [];
   private vehicleIdCounter: number = 0;
+  
+  // Object pooling for vehicles - reduces GC pressure
+  private vehiclePool: TrafficVehicle[] = [];
   
   // Lane tracking for collision avoidance
   private laneOccupancy: Map<number, Set<string>> = new Map();
@@ -210,7 +218,7 @@ export class TrafficManager {
   }
 
   /**
-   * Create a single traffic vehicle
+   * Create a single traffic vehicle with object pooling
    */
   private createVehicle(playerZ: number): TrafficVehicle | null {
     // Select random lane
@@ -247,24 +255,49 @@ export class TrafficManager {
       return null; // Pool exhausted
     }
     
-    const vehicle: TrafficVehicle = {
-      id: `traffic_${this.vehicleIdCounter++}`,
-      instanceIndex,
-      position: new THREE.Vector3(
+    let vehicle: TrafficVehicle;
+    
+    // Reuse from pool if available (object pooling optimization)
+    if (this.vehiclePool.length > 0) {
+      vehicle = this.vehiclePool.pop()!;
+      // Reset pooled properties
+      vehicle.id = `traffic_${this.vehicleIdCounter++}`;
+      vehicle.instanceIndex = instanceIndex;
+      vehicle.position.set(
         lane * TRAFFIC_CONFIG.LANE_WIDTH,
         0,
         spawnZ
-      ),
-      speed: baseSpeed,
-      targetSpeed: baseSpeed,
-      lane,
-      targetLane: null,
-      vehicleClass,
-      isLaneChanging: false,
-      laneChangeProgress: 0,
-      isActive: true,
-      zPosition: spawnZ,
-    };
+      );
+      vehicle.speed = baseSpeed;
+      vehicle.targetSpeed = baseSpeed;
+      vehicle.lane = lane;
+      vehicle.targetLane = null;
+      vehicle.vehicleClass = vehicleClass;
+      vehicle.isLaneChanging = false;
+      vehicle.laneChangeProgress = 0;
+      vehicle.isActive = true;
+      vehicle.zPosition = spawnZ;
+    } else {
+      // Create new vehicle
+      vehicle = {
+        id: `traffic_${this.vehicleIdCounter++}`,
+        instanceIndex,
+        position: new THREE.Vector3(
+          lane * TRAFFIC_CONFIG.LANE_WIDTH,
+          0,
+          spawnZ
+        ),
+        speed: baseSpeed,
+        targetSpeed: baseSpeed,
+        lane,
+        targetLane: null,
+        vehicleClass,
+        isLaneChanging: false,
+        laneChangeProgress: 0,
+        isActive: true,
+        zPosition: spawnZ,
+      };
+    }
     
     // Update instance transform
     this.updateInstanceTransform(vehicle);
@@ -475,8 +508,16 @@ export class TrafficManager {
   private updateInstanceTransform(vehicle: TrafficVehicle): void {
     if (!this.instancedMeshManager) return;
     
-    const rotation = new THREE.Euler(0, 0, 0);
-    const scale = new THREE.Vector3(1, 1, 1);
+    // Cache matrices to avoid allocations
+    if (!vehicle._cachedMatrix) {
+      vehicle._cachedMatrix = new THREE.Matrix4();
+      vehicle._cachedRotation = new THREE.Euler();
+      vehicle._cachedQuaternion = new THREE.Quaternion();
+      vehicle._cachedScale = new THREE.Vector3(1, 1, 1);
+    }
+    
+    const rotation = vehicle._cachedRotation;
+    rotation.set(0, 0, 0);
     
     // Slight rotation during lane changes
     if (vehicle.isLaneChanging && vehicle.targetLane !== null) {
@@ -484,11 +525,16 @@ export class TrafficManager {
       rotation.y = turnDirection * 0.1 * (1 - vehicle.laneChangeProgress);
     }
     
-    this.instancedMeshManager.updateInstance(
-      vehicle.instanceIndex,
+    vehicle._cachedQuaternion.setFromEuler(rotation);
+    vehicle._cachedMatrix.compose(
       vehicle.position,
-      rotation,
-      scale
+      vehicle._cachedQuaternion,
+      vehicle._cachedScale
+    );
+    
+    this.instancedMeshManager.updateInstanceWithMatrix(
+      vehicle.instanceIndex,
+      vehicle._cachedMatrix
     );
   }
 
@@ -532,7 +578,7 @@ export class TrafficManager {
   }
 
   /**
-   * Remove a vehicle
+   * Remove a vehicle and return to pool
    */
   private removeVehicle(id: string): void {
     const vehicle = this.vehicles.get(id);
@@ -551,6 +597,10 @@ export class TrafficManager {
     if (laneSet) {
       laneSet.delete(id);
     }
+    
+    // Return to pool instead of deleting (object pooling optimization)
+    vehicle.isActive = false;
+    this.vehiclePool.push(vehicle);
     
     this.vehicles.delete(id);
   }
