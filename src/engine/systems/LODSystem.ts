@@ -15,6 +15,8 @@ export interface LODConfig {
 export class LODSystem {
   private config: LODConfig;
   private lodObjects: Map<string, LODObject> = new Map();
+  // Cache for distance calculations to reduce allocations
+  private _cachedVector = new THREE.Vector3();
 
   constructor(config?: Partial<LODConfig>) {
     this.config = {
@@ -43,7 +45,8 @@ export class LODSystem {
       const node = sceneGraph.getNode(nodeId);
       if (!node || node.isCulled) continue;
 
-      const distance = camera.position.distanceTo(lodObj.mesh.position);
+      // Use cached vector to reduce allocations
+      const distance = this._cachedVector.copy(camera.position).distanceTo(lodObj.mesh.position);
       const appropriateLOD = this.getLODForDistance(distance);
 
       if (appropriateLOD !== lodObj.currentLOD) {

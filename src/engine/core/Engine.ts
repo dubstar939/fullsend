@@ -146,6 +146,9 @@ export class Engine {
       // Reduce shadow bias issues
       dirLight.shadow.bias = -0.0001;
       dirLight.shadow.normalBias = 0.02;
+      
+      // Manual shadow map updates for better performance
+      dirLight.shadow.autoUpdate = false;
     }
     
     this.scene.add(dirLight);
