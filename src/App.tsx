@@ -35,7 +35,7 @@ const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(() => ({
     coins: loadFromStorage(STORAGE_KEYS.COINS, 0),
     highScore: loadFromStorage(STORAGE_KEYS.HIGH_SCORE, 0),
-    cars: loadFromStorage(STORAGE_KEYS.CARS, INITIAL_CARS),
+    cars: loadFromStorage(STORAGE_KEYS.UNLOCKED_CARS, INITIAL_CARS),
     selectedCarIndex: 0,
     lastScore: 0,
     lastCoins: 0,
@@ -52,7 +52,7 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.COINS, gameState.coins.toString());
     localStorage.setItem(STORAGE_KEYS.HIGH_SCORE, gameState.highScore.toString());
-    localStorage.setItem(STORAGE_KEYS.CARS, JSON.stringify(gameState.cars));
+    localStorage.setItem(STORAGE_KEYS.UNLOCKED_CARS, JSON.stringify(gameState.cars));
     localStorage.setItem('nohesi_total_races', gameState.totalRaces.toString());
   }, [gameState.coins, gameState.highScore, gameState.cars, gameState.totalRaces]);
 
@@ -307,15 +307,51 @@ const Garage: React.FC<GarageProps> = ({ coins, cars, selectedCarIndex, onSelect
   }, [viewingIndex, cars]);
 
   const currentCar = cars[viewingIndex];
+  
+  // Debounce ref to prevent input flooding
+  const lastInputTimeRef = useRef<number>(0);
+  const INPUT_DEBOUNCE_MS = 150;
+  
   const prevCar = () => {
-    let newIndex = viewingIndex - 1;
-    if (newIndex < 0) newIndex = cars.length - 1;
+    const now = Date.now();
+    if (now - lastInputTimeRef.current < INPUT_DEBOUNCE_MS) return;
+    lastInputTimeRef.current = now;
+    
+    if (cars.length === 0) return;
+    
+    // Find previous unlocked car, skipping locked ones
+    let newIndex = viewingIndex;
+    let attempts = 0;
+    do {
+      newIndex = newIndex - 1;
+      if (newIndex < 0) newIndex = cars.length - 1;
+      attempts++;
+      // Prevent infinite loop if all cars are locked
+      if (attempts >= cars.length) break;
+    } while (!cars[newIndex].unlocked && attempts < cars.length);
+    
     setViewingIndex(newIndex);
     if (cars[newIndex].unlocked) onSelectCar(newIndex);
   };
+  
   const nextCar = () => {
-    let newIndex = viewingIndex + 1;
-    if (newIndex >= cars.length) newIndex = 0;
+    const now = Date.now();
+    if (now - lastInputTimeRef.current < INPUT_DEBOUNCE_MS) return;
+    lastInputTimeRef.current = now;
+    
+    if (cars.length === 0) return;
+    
+    // Find next unlocked car, skipping locked ones
+    let newIndex = viewingIndex;
+    let attempts = 0;
+    do {
+      newIndex = newIndex + 1;
+      if (newIndex >= cars.length) newIndex = 0;
+      attempts++;
+      // Prevent infinite loop if all cars are locked
+      if (attempts >= cars.length) break;
+    } while (!cars[newIndex].unlocked && attempts < cars.length);
+    
     setViewingIndex(newIndex);
     if (cars[newIndex].unlocked) onSelectCar(newIndex);
   };
