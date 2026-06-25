@@ -25,6 +25,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
   const roadBuilderRef = useRef<RoadMeshBuilder | null>(null);
   const freeRoamRef = useRef<HighwayFreeRoamSystem | null>(null);
   const polishEffectsRef = useRef<PolishEffectsSystem | null>(null);
+  const scoreRef = useRef<number>(0);
   
   const [currentScore, setCurrentScore] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
@@ -125,7 +126,7 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
         }
         
         // Trigger game over on collision
-        const finalScore = currentScore;
+        const finalScore = scoreRef.current;
         const earnedCoins = Math.floor(finalScore / 10);
         onGameOver(finalScore, earnedCoins);
       },
@@ -206,7 +207,9 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
       
       // Update score based on distance and speed with progressive multiplier
       const speedBonus = Math.floor(carSpeed * 0.1 * progressiveSpeedMultiplier);
-      setCurrentScore(prev => prev + Math.floor(deltaTime * (10 + speedBonus)));
+      const newScore = scoreRef.current + Math.floor(deltaTime * (10 + speedBonus));
+      scoreRef.current = newScore;
+      setCurrentScore(newScore);
       setDistance(prev => prev + Math.floor(carSpeed * deltaTime * 10));
       
       // Speed level feedback
