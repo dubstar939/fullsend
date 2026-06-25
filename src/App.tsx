@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Car, Trophy, Coins, ArrowLeft, Home, RotateCcw as Replay, Zap, TrendingUp, Clock, Award, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import Game from './Game';
 import { INITIAL_CARS, STORAGE_KEYS, CarStats } from './config/gameConfig';
 import startMenuBg from "./art/fullsendstartmenu.png";
+import { WebGpuGameRenderer } from './engine/rendering/WebGpuGameAdapter';
 
 type Screen = 'MENU' | 'GARAGE' | 'PLAYING' | 'GAMEOVER' | 'LOADING';
 
@@ -237,10 +238,67 @@ interface GarageProps {
 
 const Garage: React.FC<GarageProps> = ({ coins, cars, selectedCarIndex, onSelectCar, onBuyCar, onBack }) => {
   const [viewingIndex, setViewingIndex] = useState(selectedCarIndex);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<WebGpuGameRenderer | null>(null);
+  const animationFrameRef = useRef<number>(0);
 
   useEffect(() => {
     setViewingIndex(selectedCarIndex);
   }, [selectedCarIndex]);
+
+  // Initialize 3D preview when entering garage
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const initPreview = async () => {
+      try {
+        const renderer = new WebGpuGameRenderer(canvasRef.current);
+        await renderer.initialize();
+        rendererRef.current = renderer;
+        
+        // Load current car model
+        const currentCar = cars[viewingIndex];
+        if (currentCar.unlocked) {
+          renderer.createPlayerCar(currentCar.color);
+        }
+        
+        // Start render loop
+        const animate = () => {
+          if (rendererRef.current) {
+            rendererRef.current.renderFrame(0.016);
+            animationFrameRef.current = requestAnimationFrame(animate);
+          }
+        };
+        animate();
+      } catch (error) {
+        console.error('Failed to initialize garage preview:', error);
+      }
+    };
+
+    initPreview();
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        rendererRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update car model when viewingIndex changes
+  useEffect(() => {
+    if (!rendererRef.current) return;
+    
+    const currentCar = cars[viewingIndex];
+    if (currentCar.unlocked && rendererRef.current) {
+      // Clear previous car and create new one
+      rendererRef.current.dispose();
+      rendererRef.current.createPlayerCar(currentCar.color);
+    }
+  }, [viewingIndex, cars]);
 
   const currentCar = cars[viewingIndex];
   const prevCar = () => {
@@ -306,17 +364,28 @@ const Garage: React.FC<GarageProps> = ({ coins, cars, selectedCarIndex, onSelect
               ? 'border-yellow-400 bg-slate-800/80 shadow-[0_0_60px_rgba(234,179,8,0.2)]' 
               : 'border-slate-600 bg-slate-800/50'
           }`}>
-            {/* Car color preview */}
-            <div 
-              className="w-full h-48 rounded-2xl mb-6 shadow-inner relative overflow-hidden"
-              style={{ 
-                backgroundColor: currentCar.color,
-                backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)'
-              }}
-            >
-              {/* Shine effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-black/20" />
-            </div>
+            {/* 3D Car Preview Canvas */}
+            {currentCar.unlocked && (
+              <canvas
+                ref={canvasRef}
+                className="w-full h-64 rounded-xl mb-6 bg-slate-900/50"
+                style={{ display: 'block' }}
+              />
+            )}
+            
+            {/* Fallback color preview for locked cars or if canvas fails */}
+            {!currentCar.unlocked && (
+              <div 
+                className="w-full h-48 rounded-2xl mb-6 shadow-inner relative overflow-hidden"
+                style={{ 
+                  backgroundColor: currentCar.color,
+                  backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)'
+                }}
+              >
+                {/* Shine effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-black/20" />
+              </div>
+            )}
 
             {/* Car info */}
             <div className="text-center mb-6">
