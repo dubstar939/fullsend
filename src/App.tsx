@@ -248,11 +248,17 @@ const Garage: React.FC<GarageProps> = ({ coins, cars, selectedCarIndex, onSelect
 
   // Initialize 3D preview when entering garage
   useEffect(() => {
-    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Set explicit canvas size to match CSS dimensions
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(rect.width, 1);
+    canvas.height = Math.max(rect.height, 1);
 
     const initPreview = async () => {
       try {
-        const renderer = new WebGpuGameRenderer(canvasRef.current);
+        const renderer = new WebGpuGameRenderer(canvas);
         await renderer.initialize();
         rendererRef.current = renderer;
         
@@ -364,14 +370,12 @@ const Garage: React.FC<GarageProps> = ({ coins, cars, selectedCarIndex, onSelect
               ? 'border-yellow-400 bg-slate-800/80 shadow-[0_0_60px_rgba(234,179,8,0.2)]' 
               : 'border-slate-600 bg-slate-800/50'
           }`}>
-            {/* 3D Car Preview Canvas */}
-            {currentCar.unlocked && (
-              <canvas
-                ref={canvasRef}
-                className="w-full h-64 rounded-xl mb-6 bg-slate-900/50"
-                style={{ display: 'block' }}
-              />
-            )}
+            {/* 3D Car Preview Canvas - Always render but toggle visibility */}
+            <canvas
+              ref={canvasRef}
+              className={`w-full h-64 rounded-xl mb-6 bg-slate-900/50 ${currentCar.unlocked ? 'visible' : 'hidden'}`}
+              style={{ display: 'block' }}
+            />
             
             {/* Fallback color preview for locked cars or if canvas fails */}
             {!currentCar.unlocked && (
