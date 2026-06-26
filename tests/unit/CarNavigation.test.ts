@@ -393,20 +393,29 @@ describe('CarNavigationSystem', () => {
       // Navigate through all unlocked cars (indices 0, 2, 4, 6)
       expect(nav.getViewingIndex()).toBe(0);
       
+      // Set lastInputTime to allow immediate navigation (bypass debounce)
+      nav.setViewingIndex(0);
+      (nav as any).state.lastInputTime = 0;
+      
       nav.nextCar();
       expect(nav.getViewingIndex()).toBe(2);
+      (nav as any).state.lastInputTime = 0;
       
       nav.nextCar();
       expect(nav.getViewingIndex()).toBe(4);
+      (nav as any).state.lastInputTime = 0;
       
       nav.nextCar();
       expect(nav.getViewingIndex()).toBe(6);
+      (nav as any).state.lastInputTime = 0;
       
       nav.nextCar();
       expect(nav.getViewingIndex()).toBe(0); // Wrap
+      (nav as any).state.lastInputTime = 0;
       
       nav.prevCar();
       expect(nav.getViewingIndex()).toBe(6);
+      (nav as any).state.lastInputTime = 0;
       
       nav.prevCar();
       expect(nav.getViewingIndex()).toBe(4);
@@ -423,14 +432,17 @@ describe('CarNavigationSystem', () => {
       ];
       const nav = new CarNavigationSystem(cars, 0);
 
+      (nav as any).state.lastInputTime = 0;
       nav.nextCar();
       expect(nav.getViewingIndex()).toBe(5);
       
       // Second next should wrap to index 0 (the only other unlocked car)
+      (nav as any).state.lastInputTime = 0;
       nav.nextCar();
       expect(nav.getViewingIndex()).toBe(0);
       
       // Going back should go to index 5
+      (nav as any).state.lastInputTime = 0;
       nav.prevCar();
       expect(nav.getViewingIndex()).toBe(5);
     });
