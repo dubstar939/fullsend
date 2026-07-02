@@ -43,14 +43,14 @@ const Game: React.FC<GameProps> = ({ onGameOver, carColor, selectedCarIndex = 0 
     // Initialize environment system for enhanced visuals
     const envSystem = new EnvironmentSystem(engine.scene, engine.sceneGraph);
     envSystem.setup({
-      skyColor: 0xff8c42,
-      fogColor: 0xffaa66,
-      fogNear: 30,
-      fogFar: 250,
-      ambientLightIntensity: 0.55,
-      directionalLightIntensity: 0.85,
-      hemisphereSkyColor: 0xff8c42,
-      hemisphereGroundColor: 0x3d2817,
+      skyColor: 0x0a0a1a,
+      fogColor: 0x1a1a2e,
+      fogNear: 20,
+      fogFar: 300,
+      ambientLightIntensity: 0.35,
+      directionalLightIntensity: 0.5,
+      hemisphereSkyColor: 0x1a1a2e,
+      hemisphereGroundColor: 0x0f0f1a,
     });
     environmentRef.current = envSystem;
     

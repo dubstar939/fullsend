@@ -44,7 +44,7 @@ export class Renderer {
     const width = canvas.clientWidth || canvas.width;
     const height = canvas.clientHeight || canvas.height;
     this.renderer.setSize(width, height);
-    this.renderer.setClearColor(0x87ceeb, 1);
+    this.renderer.setClearColor(0x0a0a1a, 1);
     
     // Enable auto-clear for better performance
     this.renderer.autoClear = true;
@@ -64,13 +64,13 @@ export class Renderer {
     // Output encoding
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     
-    // Tone mapping for better visual quality
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    // Tone mapping for better visual quality - use Linear for cleaner night look
+    this.renderer.toneMapping = THREE.ReinhardToneMapping;
+    this.renderer.toneMappingExposure = 0.85;
     
-    // Create perspective camera with optimized far plane
+    // Create perspective camera with optimized far plane and correct FOV for cars
     this.camera = new THREE.PerspectiveCamera(
-      75,
+      60, // Reduced from 75 to prevent car distortion
       width / height,
       0.1,
       this.isMobile ? 500 : 1000 // Reduced render distance on mobile
